@@ -1,0 +1,9 @@
+.venv/
+.runtime/
+__pycache__/
+*.pyc
+build/
+dist/
+dist-multicam/
+*.log
+.local/
