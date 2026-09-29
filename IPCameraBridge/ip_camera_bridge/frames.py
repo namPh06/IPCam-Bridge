@@ -1,6 +1,7 @@
 ﻿"""RGB frame generation, resizing, and one bounded shared-memory frame slot."""
 
 import time
+import math
 
 import cv2
 import numpy as np
@@ -59,14 +60,16 @@ class SharedFrame:
         self._timestamp = ctx.RawValue('d', 0)
         self._lock = ctx.Lock()
 
-    def publish(self, rgb):
+    def publish(self, rgb, timestamp=None):
         if not isinstance(rgb, np.ndarray) or rgb.shape != (self.height, self.width, 3) or rgb.dtype != np.uint8:
             raise ValueError('Shared frame must match the RGB uint8 output canvas')
+        if timestamp is not None and not math.isfinite(timestamp):
+            raise ValueError('Frame timestamp must be finite')
         if not self._lock.acquire(timeout=0.01):
             return False
         try:
             np.copyto(np.frombuffer(self._pixels, dtype=np.uint8).reshape(rgb.shape), rgb)
-            self._timestamp.value = time.monotonic()
+            self._timestamp.value = time.monotonic() if timestamp is None else timestamp
             self._sequence.value += 1
             return True
         finally:

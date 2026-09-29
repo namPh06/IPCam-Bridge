@@ -21,7 +21,7 @@ class SourceSpec:
     read_timeout: float = 3.0
     retry_base: float = 1.0
     retry_cap: float = 15.0
-    max_retries: int = 8
+    max_retries: int | None = 8
 
 
 def _status(status_queue, state, message):
@@ -155,12 +155,15 @@ class RtspSource:
                 reason = rtsp_error_message(error)
                 shared.publish(slate)
                 _status(status_queue, 'lost', 'Mất kết nối')
-                if failures >= spec.max_retries:
+                if spec.max_retries is not None and failures >= spec.max_retries:
                     _status(status_queue, 'error', f'{reason}. Đã hết số lần thử lại; bấm Kết nối để thử tiếp')
                     return
-                delay = min(spec.retry_cap, 15.0, spec.retry_base * 2 ** min(failures, 30))
+                delay = min(spec.retry_cap, spec.retry_base * 2 ** min(failures, 30))
+                if spec.max_retries is None and type(error).__name__ in ('HTTPUnauthorizedError', 'HTTPForbiddenError'):
+                    delay = max(delay, 30.0)
                 failures += 1
-                _status(status_queue, 'retrying', f'{reason} — thử lại sau {delay:g} giây ({failures}/{spec.max_retries})')
+                budget = f'{failures}/{spec.max_retries}' if spec.max_retries is not None else str(failures)
+                _status(status_queue, 'retrying', f'{reason} — thử lại sau {delay:g} giây ({budget})')
                 if stop_event.wait(delay):
                     return
                 _status(status_queue, 'connecting', 'Mất kết nối — đang kết nối lại RTSP')
@@ -177,7 +180,7 @@ def run_source(spec, shared, fps, status_queue, stop_event):
         for value in (spec.connect_timeout, spec.read_timeout, spec.retry_base, spec.retry_cap):
             if not math.isfinite(value) or value <= 0:
                 raise ValueError('Timeouts and retry delays must be positive')
-        if not isinstance(spec.max_retries, int) or spec.max_retries < 0:
+        if spec.max_retries is not None and (type(spec.max_retries) is not int or spec.max_retries < 0):
             raise ValueError('Retry count must be a nonnegative integer')
         source_type = {'test': TestPatternSource, 'file': FileSource, 'rtsp': RtspSource}[spec.kind]
         _status(status_queue, 'connecting', 'Đang kết nối nguồn')

@@ -3,4 +3,5 @@ av==18.1.0
 numpy==2.5.3
 opencv-python-headless==4.13.0.92
 pyvirtualcam==0.15.0
+pywin32==312; sys_platform == "win32"
 

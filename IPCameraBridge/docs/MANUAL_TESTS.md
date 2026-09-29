@@ -1,5 +1,25 @@
 # Checklist nghiệm thu thủ công
 
+## Windows Service
+
+- [ ] Cài `IPCameraBridge-Setup.exe` từ tài khoản owner thường; UAC dùng cùng hoặc khác tài khoản quản trị vẫn giữ đúng owner.
+- [ ] Lưu hai Test Pattern, bật tự kết nối; chọn nguồn xuất, đóng cửa sổ vẫn có hình.
+- [ ] Chạy các lệnh chẩn đoán dưới đây từ PowerShell của owner; JSON không chứa thông tin đăng nhập. `status` không thay đổi cấu hình, `frames` chỉ đọc hình, `access` xác nhận owner không đọc trực tiếp file bí mật.
+
+```powershell
+& "$env:ProgramFiles\IPCameraBridge\IPCameraBridge.exe" --check-service "$env:TEMP\ipcb-status.json"
+& "$env:ProgramFiles\IPCameraBridge\IPCameraBridge.exe" --check-service "$env:TEMP\ipcb-frames.json" --check-mode frames --duration 60
+& "$env:ProgramFiles\IPCameraBridge\IPCameraBridge.exe" --check-service "$env:TEMP\ipcb-access.json" --check-mode access
+```
+
+- [ ] Thử 720p và 1080p riêng, mỗi lần 60 giây; xem fps, stale và kích thước trong báo cáo. Ngắt tất cả nguồn trước đổi độ phân giải.
+- [ ] Kiểm tra `sc.exe qc IPCameraBridgeCapture`, `sc.exe qsidtype IPCameraBridgeCapture`, `sc.exe qfailure IPCameraBridgeCapture`: LocalService, Automatic, service SID, recovery 5/15/30 giây.
+- [ ] Trong phiên thử riêng, Stop/Start service, xác nhận publisher tự kết nối lại; Stop thủ công webcam không bị tự bật lại. Host chết phải dọn worker bằng Job Object và được SCM khôi phục.
+- [ ] Khởi động lại Windows vào thời điểm phù hợp: service chạy trước logon, helper ẩn chỉ chạy sau logon. Không đánh dấu đạt chỉ từ test foreground.
+- [ ] RTSP thật: nhập mật khẩu nguyên bản có `@`, mất mạng lâu rồi phục hồi, chọn camera khác, đóng UI; kiểm tra riêng Meet và Zoom có video chuyển động.
+- [ ] Gỡ bằng Settings → Apps: task/helper/service dừng sạch, giữ dữ liệu mặc định, không gỡ OBS. Cài lại cùng owner đọc lại camera; owner khác bị từ chối.
+- [ ] Máy Windows x64 không có Python vẫn cài/chạy được bộ cài.
+
 Tài liệu này mô tả **việc cần kiểm tra**, không phải kết quả đã chạy. Các ô đều để trống cho người nghiệm thu. Test tự động/mock không chứng minh thiết bị OBS, camera thật, Google Meet hoặc Zalo hoạt động trên máy đích.
 
 Ghi ngày, Windows/build, CPU, Python x64 hoặc bản `.exe`, phiên bản OBS/Chrome/Zalo, nguồn thử và kết quả. Không ghi URL RTSP thật, tài khoản, mật khẩu hoặc ảnh chụp chứa bí mật. Có thể định danh nguồn bằng nhãn như “camera thử A”.

@@ -10,12 +10,54 @@ import time
 
 def main():
     parser = argparse.ArgumentParser(description="IP Camera Bridge")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--service', action='store_true')
+    mode.add_argument('--install-service', action='store_true')
+    mode.add_argument('--uninstall-service', action='store_true')
+    mode.add_argument('--session-helper', action='store_true')
+    mode.add_argument('--stop-session', action='store_true')
+    mode.add_argument('--desktop', action='store_true')
+    mode.add_argument('--check-service', metavar='REPORT_JSON')
+    parser.add_argument('--check-mode', choices=('status', 'frames', 'access'), default='status')
+    parser.add_argument('--duration', type=int, choices=range(1, 601), default=5)
+    parser.add_argument('--owner-pid', type=int)
+    parser.add_argument('--remove-data', action='store_true')
     parser.add_argument("--smoke-test", metavar="DIRECTORY", help="Offscreen pattern/GUI smoke; save JSON and PNG")
     parser.add_argument("--source-file", help="Use a video file in the smoke test")
     parser.add_argument("--probe-webcam", action="store_true", help="Try the installed OBS backend during smoke")
     parser.add_argument("--smoke-cameras", type=int, choices=range(1, 17), default=1,
                         help="Number of concurrent sources in the smoke test")
     args = parser.parse_args()
+    if args.check_service:
+        from .windows_service import service_report
+        return service_report(args.check_service, args.check_mode, args.duration)
+    # SCM/install modes must never import Qt or instantiate QApplication.
+    if args.service or args.install_service or args.uninstall_service:
+        from .windows_service import run_service, install_service, uninstall_service
+        if args.service:
+            return run_service()
+        try:
+            if args.install_service:
+                if not getattr(sys, 'frozen', False) or not args.owner_pid:
+                    return 1
+                install_service(Path(sys.executable), args.owner_pid)
+            else:
+                uninstall_service(args.remove_data)
+            return 0
+        except Exception:
+            # Installer reports a fixed error; no raw exception/credentials in UI or logs.
+            return 1
+    if not args.smoke_test:
+        from .windows_service import owner_policy, service_installed
+        policy = owner_policy()
+        if policy and not service_installed():
+            policy = None  # Uninstall may retain encrypted profiles and owner enrollment.
+        if args.session_helper or args.stop_session or policy and not args.desktop:
+            from .service_session import run_service_session
+            return run_service_session(hidden=args.session_helper, stop_only=args.stop_session)
+        if policy and args.desktop:
+            # A registered service owns capture; do not start a competing desktop publisher.
+            return 1
     if args.smoke_test:
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
     from PySide6.QtCore import QTimer

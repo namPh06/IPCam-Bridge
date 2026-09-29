@@ -1,5 +1,16 @@
 # Báo cáo kiểm thử IP Camera Bridge
 
+## Windows Service — 29/09/2026
+
+- Toàn bộ **73/73 unittest đạt**, 10,079 giây. Bao gồm Windows DPAPI với tài khoản chạy test, named pipe thật, frame RGB có giới hạn, từ chối JSON/frame lỗi, reconnect, revision/save nguyên tử, lifecycle worker và hồi phục khóa bị bỏ lại. Các mock SCM/token không thay thế thử service thật.
+- Review độc lập phát hiện ba lỗi: owner thư mục dữ liệu có sẵn, semaphore của publisher bị chết, routing sau uninstall giữ dữ liệu. Đã sửa, thêm test hồi quy và review lại không còn lỗi critical/important trong ba phần này.
+- Payload service PyInstaller onedir build thành công; đã xác nhận `python313.dll`, `pythoncom313.dll`, `pywintypes313.dll`, `servicemanager.pyd` có trong payload.
+- Chính EXE chạy smoke hai Test Pattern: cả hai connected, RGB 1280×720, 24,82 fps, Qt responsive, exit 0 sau khi dọn worker. Không chiếm thiết bị OBS trong phép thử này.
+- CLI chẩn đoán frozen trả `not_installed` đúng khi chưa có service; không mở cửa sổ và không đưa credential vào JSON.
+- Bộ cài Inno Setup đã biên dịch thành công. Chưa thể coi đây là bằng chứng UAC, LocalService/DPAPI, SCM recovery, boot/logon hoặc Meet/Zoom đã đạt. Các phép nghiệm thu thực tế ghi riêng khi thực hiện.
+
+Hướng dẫn chạy/gỡ trong [SERVICE_PACKAGING.md](SERVICE_PACKAGING.md); các bước máy đích còn lại trong [MANUAL_TESTS.md](MANUAL_TESTS.md).
+
 ## Cập nhật nhiều camera và tự khởi động — 28/09/2026
 
 - `python -m unittest discover -s tests -q`: **50/50 đạt**, 14,091 giây.

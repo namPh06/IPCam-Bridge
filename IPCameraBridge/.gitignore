@@ -7,3 +7,7 @@ dist/
 dist-multicam/
 *.log
 .local/
+.build-tools/
+build-service/
+dist-service/
+.local-service-*.txt

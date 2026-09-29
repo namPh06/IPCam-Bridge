@@ -12,6 +12,9 @@ Ngày đối chiếu nguồn chính thức: **2026-09-28**. Mục tiêu: **Windo
 | opencv-python-headless | `4.13.0.92` | `cp37-abi3-win_amd64` | [Resize, vẽ pattern; không có GUI OpenCV](https://pypi.org/project/opencv-python-headless/4.13.0.92/) |
 | pyvirtualcam | `0.15.0` | `cp313-cp313-win_amd64` | [Xuất vào webcam đã cài](https://pypi.org/project/pyvirtualcam/0.15.0/) |
 | PyInstaller | `6.22.3` | `py3-none-win_amd64` | [Chỉ cần khi build](https://pypi.org/project/pyinstaller/6.22.3/) |
+| pywin32 | `312` | `cp313-cp313-win_amd64` | [SCM, token, ACL, named pipe, Task Scheduler](https://pypi.org/project/pywin32/312/) |
+
+Bộ cài service dùng Inno Setup 6.7.3; chỉ máy build cần compiler. Payload onedir đã chứa Python và DLL pywin32, không chạy `pywin32_postinstall` trên máy nhận.
 
 Wheel `abi3` có thể dùng trên CPython mới hơn mốc trong tên wheel. Không dùng các wheel `cp313t` dành cho bản free-threaded. Pin trực tiếp ở `requirements.txt` và `requirements-build.txt`; đây không phải lockfile toàn bộ phụ thuộc bắc cầu.
 
