@@ -9,15 +9,17 @@ from uuid import uuid4
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFormLayout, QHBoxLayout,
-    QLabel, QLineEdit, QMainWindow, QMenu, QPushButton, QStyle, QSystemTrayIcon, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog,
+    QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+    QMainWindow, QMenu, QPushButton, QStyle, QSystemTrayIcon, QVBoxLayout, QWidget)
 
 from .controller import ManagedProcess
 from .frames import SharedFrame, status_frame
 from .output import run_output
+from .onvif_discovery import discover_onvif
 from .service_config import migrate_profiles
 from .service_ipc import ServiceClient
-from .windows_settings import load_profiles, set_startup
+from .windows_settings import MAX_CAMERAS, load_profiles, set_startup
 
 ERRORS = {'source_busy': 'Ngắt nguồn trước khi sửa thông tin kết nối hoặc độ phân giải.',
           'stale_revision': 'Cấu hình đã thay đổi. Bấm Tải lại rồi chỉnh sửa.',
@@ -239,10 +241,13 @@ class ServiceWindow(QMainWindow):
         self.cameras.setAccessibleName('Camera đang chỉnh sửa')
         self.cameras.currentIndexChanged.connect(self.select_editor)
         row.addWidget(self.cameras, 1)
-        for label, callback in (('Thêm', self.add_camera), ('Xóa', self.remove_camera), ('Xuất camera này', self.select_output)):
+        for label, callback in (('Thêm', self.add_camera), ('Quét LAN', self.scan_lan),
+                                ('Xóa', self.remove_camera), ('Xuất camera này', self.select_output)):
             button = QPushButton(label)
             button.clicked.connect(callback)
             row.addWidget(button)
+            if callback == self.scan_lan:
+                self.scan_button = button
         layout.addLayout(row)
         form = QFormLayout()
         self.name, self.address, self.username, self.password = (QLineEdit() for _ in range(4))
@@ -285,6 +290,9 @@ class ServiceWindow(QMainWindow):
         layout.addWidget(self.state)
         layout.addWidget(self.notice)
         layout.addWidget(QLabel('Trong Meet / Zoom chọn OBS Virtual Camera. Cài OBS một lần; không bật Virtual Camera trong OBS.'))
+        self.discovery_results = queue.Queue(1)
+        self.discovery_timer = QTimer(self)
+        self.discovery_timer.timeout.connect(self.finish_scan)
 
     def receive(self, response):
         command = response.get('_command')
@@ -340,13 +348,80 @@ class ServiceWindow(QMainWindow):
             self.populate()
 
     def add_camera(self):
-        if not self.config or len(self.config['cameras']) >= 16:
+        if not self.config or len(self.config['cameras']) >= MAX_CAMERAS:
             return
         self.capture()
         self.config['cameras'].append({'id': str(uuid4()), 'name': f'Camera {len(self.config["cameras"]) + 1}',
             'kind': 'test', 'address': '', 'username': '', 'password': ''})
         self.index = len(self.config['cameras']) - 1
         self.populate()
+
+    def scan_lan(self):
+        if not self.config or self.discovery_timer.isActive():
+            return
+        self.scan_button.setEnabled(False)
+        self.notice.setText('Đang quét camera ONVIF trong LAN…')
+        def worker():
+            try:
+                result = discover_onvif()
+            except OSError:
+                result = None
+            self.discovery_results.put(result)
+        threading.Thread(target=worker, daemon=True).start()
+        self.discovery_timer.start(100)
+
+    def finish_scan(self):
+        try:
+            devices = self.discovery_results.get_nowait()
+        except queue.Empty:
+            return
+        self.discovery_timer.stop()
+        self.scan_button.setEnabled(True)
+        if devices is None:
+            self.notice.setText('Không quét được LAN. Kiểm tra mạng và quyền Windows Firewall.')
+            return
+        if not devices:
+            self.notice.setText('Không tìm thấy camera ONVIF. Bạn vẫn có thể thêm URL RTSP thủ công.')
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Camera ONVIF trong LAN')
+        dialog.resize(620, 360)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel('Chọn camera cần thêm. Sau đó nhập đường dẫn RTSP, tài khoản và mật khẩu.'))
+        choices = QListWidget()
+        choices.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        for device in devices:
+            item = QListWidgetItem(f'{device.name} — {device.host}')
+            item.setData(Qt.ItemDataRole.UserRole, device)
+            choices.addItem(item)
+        choices.selectAll()
+        layout.addWidget(choices)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            self.notice.setText('Đã hủy thêm camera từ LAN.')
+            return
+        self.capture()
+        added = 0
+        addresses = {camera.get('address') for camera in self.config['cameras']}
+        for item in choices.selectedItems():
+            if len(self.config['cameras']) >= MAX_CAMERAS:
+                break
+            device = item.data(Qt.ItemDataRole.UserRole)
+            if device.rtsp_url in addresses:
+                continue
+            self.config['cameras'].append({'id': str(uuid4()), 'name': device.name, 'kind': 'rtsp',
+                'address': device.rtsp_url, 'username': '', 'password': ''})
+            addresses.add(device.rtsp_url)
+            added += 1
+        if added:
+            self.index = len(self.config['cameras']) - 1
+            self.populate()
+            self.notice.setText(f'Đã thêm {added} camera. Hoàn thiện đường dẫn RTSP và thông tin đăng nhập rồi bấm Lưu cấu hình.')
+        else:
+            self.notice.setText('Các camera đã chọn đã có trong danh sách hoặc danh sách đã đủ 16 camera.')
 
     def remove_camera(self):
         if self.config and len(self.config['cameras']) > 1:

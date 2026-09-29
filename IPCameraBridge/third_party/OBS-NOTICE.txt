@@ -1,0 +1,10 @@
+OBS Studio 32.2.2 is optional third-party software distributed unchanged.
+Copyright OBS Project contributors. Licensed under GNU GPL v2 or later.
+
+Official release and Windows installer:
+https://github.com/obsproject/obs-studio/releases/tag/32.2.2
+
+Corresponding source code:
+https://github.com/obsproject/obs-studio/tree/32.2.2
+
+IP Camera Bridge does not remove OBS Studio during uninstall.

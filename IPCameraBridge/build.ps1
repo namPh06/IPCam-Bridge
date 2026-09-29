@@ -1,15 +1,16 @@
 ﻿param(
     [switch]$Service,
     [string]$PythonPath,
-    [string]$ISCCPath
+    [string]$ISCCPath,
+    [string]$OBSInstallerPath
 )
 
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $pythonExe = if ($PythonPath) { $PythonPath } else { Join-Path $PSScriptRoot '.venv\Scripts\python.exe' }
 if (-not (Test-Path -LiteralPath $pythonExe)) { throw 'Chạy run.ps1 -Setup trước.' }
-& $pythonExe -m pip install --only-binary=:all: -r requirements-build.txt
-if ($LASTEXITCODE -ne 0) { throw 'Không cài được thư viện đóng gói.' }
+& $pythonExe -m pip check
+if ($LASTEXITCODE -ne 0) { throw 'Môi trường build thiếu hoặc xung đột thư viện. Chạy run.ps1 -Setup trước.' }
 & $pythonExe -m unittest discover -s tests -v
 if ($LASTEXITCODE -ne 0) { throw 'Kiểm thử thất bại; không đóng gói.' }
 if (-not $Service) {
@@ -17,6 +18,25 @@ if (-not $Service) {
     if ($LASTEXITCODE -ne 0) { throw 'Đóng gói thất bại.' }
     Write-Host 'Bản một file: dist\IPCameraBridge.exe (máy nhận cần cài OBS để dùng webcam ảo)'
     exit 0
+}
+
+$obsName = 'OBS-Studio-32.2.2-Windows-x64-Installer.exe'
+$obsHash = 'C3A0B880ADBE64DC4BCB68F93016916AB5B55AE43FD227115287BF80257D92DC'
+$obsDirectory = Join-Path $PSScriptRoot 'third_party'
+$obsTarget = Join-Path $obsDirectory $obsName
+if ($OBSInstallerPath) {
+    New-Item -ItemType Directory -Path $obsDirectory -Force | Out-Null
+    Copy-Item -LiteralPath $OBSInstallerPath -Destination $obsTarget -Force
+}
+if (-not (Test-Path -LiteralPath $obsTarget)) {
+    throw "Thiếu bộ cài OBS chính thức. Chạy lại với -OBSInstallerPath <đường dẫn $obsName>."
+}
+if ((Get-FileHash -LiteralPath $obsTarget -Algorithm SHA256).Hash -ne $obsHash) {
+    throw 'Bộ cài OBS không đúng phiên bản/hash chính thức; đã dừng đóng gói.'
+}
+$obsSignature = Get-AuthenticodeSignature -LiteralPath $obsTarget
+if ($obsSignature.Status -ne 'Valid' -or $obsSignature.SignerCertificate.Subject -notlike '*O="OBS Project, LLC"*') {
+    throw 'Chữ ký số của bộ cài OBS không hợp lệ; đã dừng đóng gói.'
 }
 
 & $pythonExe -m PyInstaller --noconfirm --distpath dist-service --workpath build-service IPCameraBridge-service.spec
@@ -47,5 +67,6 @@ $setup = Join-Path $PSScriptRoot 'dist-service\IPCameraBridge-Setup.exe'
 $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash
 Set-Content -LiteralPath ($setup + '.sha256') -Value "$hash  IPCameraBridge-Setup.exe" -Encoding ASCII
 Write-Host 'Bộ cài một file: dist-service\IPCameraBridge-Setup.exe'
+Write-Host "Kèm tùy chọn cài OBS Studio 32.2.2: $obsName"
 Write-Host "SHA256: $hash"
 

@@ -1,5 +1,6 @@
 #define AppName "IP Camera Bridge"
-#define AppVersion "0.2.0"
+#define AppVersion "0.3.0"
+#define OBSInstaller "OBS-Studio-32.2.2-Windows-x64-Installer.exe"
 
 [Setup]
 AppId={{B84E65CA-8D78-41AE-8961-9F36A6C8EC24}
@@ -32,6 +33,11 @@ SetupLogging=yes
 
 [Files]
 Source: "dist-service\IPCameraBridge\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: IsAdminInstallMode
+Source: "third_party\OBS-NOTICE.txt"; DestDir: "{app}"; Flags: ignoreversion; Check: IsAdminInstallMode
+Source: "third_party\{#OBSInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: ShouldInstallOBS
+
+[Tasks]
+Name: "installobs"; Description: "Cài OBS Studio 32.2.2 (cung cấp thiết bị OBS Virtual Camera)"; GroupDescription: "Thành phần tùy chọn:"; Check: CanChooseOBS
 
 [Icons]
 Name: "{commonprograms}\{#AppName}"; Filename: "{app}\IPCameraBridge.exe"; Check: IsAdminInstallMode
@@ -44,6 +50,21 @@ var
 function GetCustomSetupExitCode: Integer;
 begin
   if InstallFailed then Result := 1 else Result := 0;
+end;
+
+function IsOBSInstalled: Boolean;
+begin
+  Result := FileExists(ExpandConstant('{commonpf64}\obs-studio\bin\64bit\obs64.exe'));
+end;
+
+function CanChooseOBS: Boolean;
+begin
+  Result := IsAdminInstallMode and not IsOBSInstalled;
+end;
+
+function ShouldInstallOBS: Boolean;
+begin
+  Result := CanChooseOBS and WizardIsTaskSelected('installobs');
 end;
 
 function InstallDirectory(Param: String): String;
@@ -131,6 +152,13 @@ begin
       RaiseException('Could not start the service installer.');
     if Code <> 0 then
       RaiseException('Service registration failed. Camera data was preserved.');
+    if ShouldInstallOBS then begin
+      if not Exec(ExpandConstant('{tmp}\{#OBSInstaller}'), '/S',
+                  ExpandConstant('{tmp}'), SW_HIDE, ewWaitUntilTerminated, Code) then
+        SuppressibleMsgBox('IP Camera Bridge was installed, but the optional OBS Studio installer could not start. Install OBS Studio separately.', mbError, MB_OK, IDOK)
+      else if Code <> 0 then
+        SuppressibleMsgBox('IP Camera Bridge was installed, but OBS Studio installation failed. Install OBS Studio separately.', mbError, MB_OK, IDOK);
+    end;
     InstallFailed := False;
   end;
 end;

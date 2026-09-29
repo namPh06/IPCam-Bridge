@@ -2,10 +2,11 @@
 
 ## Bản Windows Service
 
-Bộ cài: `dist-service\IPCameraBridge-Setup.exe`. Mở bình thường bằng tài khoản sẽ dùng camera; bộ cài tự yêu cầu quyền quản trị. Cần cài OBS Studio riêng để có thiết bị OBS Virtual Camera. Xem [hướng dẫn bộ cài](docs/SERVICE_PACKAGING.md) và [kết quả kiểm thử](docs/TEST_REPORT.md).
+Bộ cài: `dist-service\IPCameraBridge-Setup.exe`. Mở bình thường bằng tài khoản sẽ dùng camera; bộ cài tự yêu cầu quyền quản trị và cho phép cài kèm OBS Studio nếu máy chưa có. Xem [hướng dẫn bộ cài](docs/SERVICE_PACKAGING.md) và [kết quả kiểm thử](docs/TEST_REPORT.md).
 
 - Service nhận camera ngay khi Windows khởi động. Bộ xuất webcam chạy ẩn sau khi tài khoản sở hữu đăng nhập; không tự mở cửa sổ quản lý.
 - Mở **IP Camera Bridge** từ Start, thêm camera, chọn **Tự kết nối và bật webcam** rồi lưu. Có thể nhập cấu hình desktop cũ bằng nút chuyển cấu hình; chỉ tắt startup desktop sau khi service xác nhận lưu thành công.
+- Nút **Quét LAN** dò camera hỗ trợ ONVIF WS-Discovery. Chọn camera cần thêm, hoàn thiện đường dẫn RTSP do hãng cung cấp, nhập tài khoản/mật khẩu rồi lưu.
 - Đóng cửa sổ chỉ ẩn giao diện. Menu khay cho phép bật/dừng webcam hoặc thoát bộ xuất; service vẫn nhận nguồn. Chọn **OBS Virtual Camera** trong Meet/Zoom và dùng micro riêng.
 - Camera service lưu tại `%ProgramData%\IPCameraBridge\service\cameras.dat`, mã hóa bằng Windows DPAPI của tài khoản service và giới hạn quyền truy cập. Không sao chép file này sang máy khác để dùng lại mật khẩu.
 - Tối đa 16 nguồn, một camera xuất mỗi lúc. Service thử lại khi mất mạng cho đến khi người dùng ngắt nguồn; không bị giới hạn tám lần như bản desktop.
@@ -14,7 +15,7 @@ Các mục dưới đây mô tả bản desktop cũ. Khi đã cài service, mở
 
 Ứng dụng Windows đưa **Test Pattern**, **Video File** hoặc **RTSP** vào preview và **OBS Virtual Camera** để chọn trong Google Meet. Đầu ra mặc định **1280 × 720, 25 fps**; có tùy chọn **1920 × 1080, 25 fps**. Ảnh giữ đúng tỷ lệ, thêm viền đen khi cần.
 
-Chỉ xử lý hình ảnh. Âm thanh trong file/RTSP được bỏ qua; chọn micro riêng trong Meet. MVP không gồm dò camera, ghi hình, PTZ, AI hoặc driver webcam riêng.
+Chỉ xử lý hình ảnh. Âm thanh trong file/RTSP được bỏ qua; chọn micro riêng trong Meet. Không gồm ghi hình, PTZ, AI hoặc driver webcam riêng.
 
 ## Chuẩn bị
 
