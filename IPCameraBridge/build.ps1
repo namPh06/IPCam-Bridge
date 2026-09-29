@@ -52,6 +52,7 @@ if (-not $ISCCPath) {
     if ($compiler) { $ISCCPath = $compiler.Source }
     foreach ($candidate in @(
         (Join-Path $PSScriptRoot '.build-tools\InnoSetup6\ISCC.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
         "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
         "$env:ProgramFiles\Inno Setup 7\ISCC.exe"
     )) {

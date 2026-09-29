@@ -66,6 +66,32 @@ class SessionTests(unittest.TestCase):
         finally:
             session.close()
 
+    def test_service_window_marks_output_and_uses_stateful_action_buttons(self):
+        session = ServiceSession('test-owner', start_worker=False)
+        camera_id = str(uuid4())
+        response = {'ok': True, '_command': 'status', 'revision': 0, 'generation': 0, 'data': {
+            'pid': os.getpid(), 'sequence': 0,
+            'config': {'revision': 0, 'resolution': '720p', 'auto_connect': False,
+                       'selected_id': camera_id, 'cameras': [{
+                           'id': camera_id, 'name': 'Sảnh chính', 'kind': 'test', 'address': '',
+                           'username': '', 'has_password': False}]},
+            'cameras': [{'id': camera_id, 'state': 'connected', 'message': 'Đã kết nối',
+                         'fps': 15.0, 'wanted': True}]}}
+        try:
+            session.want_output = False
+            session.status = response
+            session.open_window()
+            session.window.receive(response)
+            session.window.refresh()
+            self.assertIn('ĐANG XUẤT', session.window.cameras.itemText(0))
+            self.assertEqual(session.window.output_select_button.text(), '✓ Camera đang xuất')
+            self.assertEqual(session.window.connect_button.text(), 'Ngắt camera đang chọn')
+            self.assertEqual(session.window.output_button.text(), 'Bật webcam ảo')
+            session.window.toggle_selected()
+            self.assertEqual(session.commands.get_nowait()['command'], 'disconnect')
+        finally:
+            session.close()
+
     def test_real_pipe_session_receives_capture_and_manual_output_stop_survives_status(self):
         token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32security.TOKEN_QUERY)
         sid = win32security.GetTokenInformation(token, win32security.TokenUser)[0]

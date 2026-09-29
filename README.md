@@ -4,8 +4,8 @@
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows11&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.3.0-2E8B57)
-![Tests](https://img.shields.io/badge/tests-77%20passed-brightgreen)
+![Version](https://img.shields.io/badge/version-0.3.1-2E8B57)
+![Tests](https://img.shields.io/badge/tests-78%20passed-brightgreen)
 
 IP Camera Bridge nhận hình ảnh từ RTSP, video hoặc Test Pattern, hiển thị preview và xuất một camera đã chọn qua thiết bị **OBS Virtual Camera**. Ứng dụng hỗ trợ tối đa 16 nguồn, tự kết nối lại khi mất mạng và có thể hoạt động nền cùng Windows.
 
@@ -100,25 +100,25 @@ Nên kiểm tra bằng Test Pattern trước khi kết nối camera thật:
 
 1. Mở **IP Camera Bridge** từ Start.
 2. Chọn camera `Test Pattern 1`.
-3. Bấm **Kết nối camera** và kiểm tra preview có hình chuyển động.
-4. Bấm **Xuất camera này**.
-5. Bấm **Bật webcam**.
+3. Bấm **Kết nối camera đang chọn** và kiểm tra preview có hình chuyển động.
+4. Bấm **Chọn camera này để xuất**. Camera đang dùng sẽ có dấu **✓ ĐANG XUẤT**.
+5. Bấm **Bật webcam ảo**.
 6. Mở Google Meet hoặc Zoom và chọn **OBS Virtual Camera**.
 
 Nếu Test Pattern hoạt động trong cuộc họp, đường xuất webcam đã sẵn sàng. Tiếp theo có thể quét LAN hoặc nhập RTSP thủ công.
 
 ## Quét camera trong LAN
 
-Nút **Quét LAN** nằm trên hàng đầu, giữa **Thêm** và **Xóa**.
+Nút **Quét camera LAN** nằm trong phần **1. Chọn và cấu hình camera**.
 
 1. Kết nối máy tính vào cùng mạng LAN/VLAN với camera.
-2. Bấm **Quét LAN** và chờ khoảng vài giây.
+2. Bấm **Quét camera LAN** và chờ khoảng vài giây.
 3. Chọn một hoặc nhiều camera ONVIF trong danh sách.
 4. Bấm **OK** để thêm các camera đã chọn.
 5. Chọn từng camera và hoàn thiện trường **URL RTSP / file**.
 6. Chọn nguồn **RTSP**, nhập tên đăng nhập và mật khẩu.
 7. Bấm **Lưu cấu hình**.
-8. Bấm **Kết nối camera** để kiểm tra preview.
+8. Bấm **Kết nối camera đang chọn** để kiểm tra preview.
 
 WS-Discovery thường chỉ xác định được thiết bị và địa chỉ IP. Đường dẫn stream RTSP phụ thuộc hãng camera nên vẫn cần kiểm tra tài liệu của camera. Ví dụ:
 
@@ -146,7 +146,7 @@ Nếu không tìm thấy camera:
 
 5. Nhập **Tên đăng nhập** và **Mật khẩu** vào hai ô riêng.
 6. Chọn `720p` hoặc `1080p` tại **Đầu ra 25 fps**.
-7. Bấm **Lưu cấu hình**, sau đó bấm **Kết nối camera**.
+7. Bấm **Lưu cấu hình**, sau đó bấm **Kết nối camera đang chọn**.
 
 Nhập mật khẩu ở dạng nguyên bản. Ví dụ, nếu mật khẩu chứa `@`, hãy nhập ký tự `@`; không đổi thành `%40`. Ứng dụng tự mã hóa ký tự đặc biệt đúng một lần khi tạo URL nội bộ.
 
@@ -155,11 +155,11 @@ Nhập mật khẩu ở dạng nguyên bản. Ví dụ, nếu mật khẩu chứ
 
 ## Sử dụng nhiều camera
 
-- Bấm **Thêm** hoặc **Quét LAN** để tạo tối đa 16 camera.
+- Bấm **+ Thêm camera** hoặc **Quét camera LAN** để tạo tối đa 16 camera.
 - Bấm **Kết nối tất cả** để nhận đồng thời các nguồn đã lưu.
-- Chọn camera trong danh sách rồi bấm **Xuất camera này** để chuyển hình đưa vào webcam ảo.
+- Chọn camera trong danh sách rồi bấm **Chọn camera này để xuất** để chuyển hình đưa vào webcam ảo.
 - Google Meet/Zoom vẫn sử dụng cùng một thiết bị **OBS Virtual Camera** khi chuyển camera.
-- Bấm **Ngắt camera** để dừng nguồn đang chọn hoặc **Ngắt tất cả** để dừng toàn bộ nguồn.
+- Nút **Kết nối camera đang chọn** tự đổi thành **Ngắt camera đang chọn** khi nguồn đang chạy. Nút **Kết nối tất cả** cũng tự đổi thành **Ngắt tất cả**.
 
 Ứng dụng xuất một camera tại một thời điểm. Các camera còn lại có thể tiếp tục kết nối để chuyển nguồn nhanh, tùy khả năng CPU và mạng của máy.
 
@@ -167,17 +167,17 @@ Nhập mật khẩu ở dạng nguyên bản. Ví dụ, nếu mật khẩu chứ
 
 ### Google Meet
 
-1. Bật webcam trong IP Camera Bridge.
+1. Bấm **Bật webcam ảo** trong IP Camera Bridge.
 2. Mở Google Meet.
 3. Chọn **Tùy chọn khác → Cài đặt → Video**.
 4. Tại **Máy ảnh**, chọn `OBS Virtual Camera`.
 5. Chọn microphone thật trong mục **Âm thanh**.
 
-Nếu vừa cài OBS khi Chrome đang mở, hãy đóng toàn bộ cửa sổ Chrome rồi mở lại.
+Nếu vừa cài OBS khi Chrome đang mở, hãy đóng toàn bộ cửa sổ Chrome rồi mở lại. Nếu Meet báo camera đang được ứng dụng khác sử dụng, đóng Zoom, Teams, Windows Camera và OBS, tải lại trang Meet, chọn lại `OBS Virtual Camera`, rồi bấm **Thử lại**.
 
 ### Zoom
 
-1. Bật webcam trong IP Camera Bridge.
+1. Bấm **Bật webcam ảo** trong IP Camera Bridge.
 2. Mở **Zoom → Settings → Video**.
 3. Chọn `OBS Virtual Camera` trong danh sách Camera.
 4. Chọn microphone riêng trong **Audio**.
@@ -221,13 +221,14 @@ Biểu tượng ở khay hệ thống cho phép mở quản lý, bật/dừng we
 
 | Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
-| Không có nút **Quét LAN** | Đang chạy bản cũ | Gỡ bản cũ nhưng giữ dữ liệu, sau đó cài bản 0.3.0 trở lên. |
+| Không có nút **Quét camera LAN** | Đang chạy bản cũ | Gỡ bản cũ nhưng giữ dữ liệu, sau đó cài bản 0.3.1 trở lên. |
 | Quét LAN không thấy camera | ONVIF discovery bị tắt, khác VLAN hoặc firewall chặn multicast | Bật ONVIF/WS-Discovery, kiểm tra mạng Private và thử nhập RTSP thủ công. |
 | Camera từ chối xác thực `401` | Sai tài khoản, mật khẩu hoặc quyền stream | Kiểm tra lại bằng VLC; nhập URL, username và mật khẩu vào ba ô riêng. |
 | Mật khẩu có `@` không kết nối | Mật khẩu đã được mã hóa thủ công | Nhập `@` nguyên bản, không nhập `%40`. |
 | VLC chạy nhưng ứng dụng không chạy | Sai URL/path trong ứng dụng hoặc đang dùng bản/cấu hình cũ | Sao chép đúng URL đã thử trong VLC, lưu lại rồi kết nối lại. |
 | Preview có hình nhưng không bật webcam | Thiếu OBS Virtual Camera hoặc thiết bị đang bị OBS/phiên bridge khác giữ | Cài OBS, dừng Virtual Camera trong OBS và đóng phiên bridge khác. |
 | Meet/Zoom không thấy OBS Virtual Camera | Ứng dụng họp đã mở trước khi driver được cài | Đóng hoàn toàn ứng dụng họp/trình duyệt rồi mở lại. |
+| Meet báo camera đang được ứng dụng khác sử dụng | Meet đang chọn camera vật lý mà Zoom/Teams/Windows Camera đang giữ, hoặc một ứng dụng khác đang dùng webcam ảo | Đóng các ứng dụng camera khác, tải lại Meet, vào **Cài đặt → Video**, chọn `OBS Virtual Camera` rồi bấm **Thử lại**. |
 | Camera mất mạng | Mạng hoặc nguồn camera gián đoạn | Service tự thử lại; kiểm tra dây/mạng và theo dõi trạng thái trong giao diện. |
 | Hình có viền đen | Tỷ lệ camera khác tỷ lệ đầu ra | Đây là hành vi bình thường để giữ đúng tỷ lệ, không kéo méo hình. |
 

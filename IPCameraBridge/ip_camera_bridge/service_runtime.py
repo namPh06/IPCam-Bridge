@@ -50,7 +50,7 @@ class CaptureRuntime:
         return {'ok': code == 'ok', 'code': code, 'revision': self.config['revision'], 'generation': self.generation,
                 'data': {'config': public_config(self.config), 'pid': os.getpid(), 'sequence': self.sequence,
                          'cameras': [{'id': spec['id'], 'state': camera.source_state, 'message': camera.source_message,
-                                      'fps': round(camera.processing_fps, 1)}
+                                      'fps': round(camera.processing_fps, 1), 'wanted': spec['id'] in self.wanted}
                                      for spec, camera in zip(self.config['cameras'], self.group.cameras)]}}
 
     def handle(self, request):
