@@ -2,12 +2,16 @@
 
 ## Windows Service — 29/09/2026
 
-- Toàn bộ **73/73 unittest đạt**, 10,079 giây. Bao gồm Windows DPAPI với tài khoản chạy test, named pipe thật, frame RGB có giới hạn, từ chối JSON/frame lỗi, reconnect, revision/save nguyên tử, lifecycle worker và hồi phục khóa bị bỏ lại. Các mock SCM/token không thay thế thử service thật.
+- Toàn bộ **76/76 unittest đạt**, 10,255 giây. Bao gồm Windows DPAPI với tài khoản chạy test, named pipe thật, frame RGB có giới hạn, từ chối JSON/frame lỗi, reconnect, revision/save nguyên tử, lifecycle worker và hồi phục khóa bị bỏ lại. Test native Job Object xác nhận host thoát dọn tiến trình con.
 - Review độc lập phát hiện ba lỗi: owner thư mục dữ liệu có sẵn, semaphore của publisher bị chết, routing sau uninstall giữ dữ liệu. Đã sửa, thêm test hồi quy và review lại không còn lỗi critical/important trong ba phần này.
 - Payload service PyInstaller onedir build thành công; đã xác nhận `python313.dll`, `pythoncom313.dll`, `pywintypes313.dll`, `servicemanager.pyd` có trong payload.
 - Chính EXE chạy smoke hai Test Pattern: cả hai connected, RGB 1280×720, 24,82 fps, Qt responsive, exit 0 sau khi dọn worker. Không chiếm thiết bị OBS trong phép thử này.
 - CLI chẩn đoán frozen trả `not_installed` đúng khi chưa có service; không mở cửa sổ và không đưa credential vào JSON.
-- Bộ cài Inno Setup đã biên dịch thành công. Chưa thể coi đây là bằng chứng UAC, LocalService/DPAPI, SCM recovery, boot/logon hoặc Meet/Zoom đã đạt. Các phép nghiệm thu thực tế ghi riêng khi thực hiện.
+- Bộ cài Inno Setup đã cài thật qua UAC: service Automatic, LocalService Session 0, service SID unrestricted; recovery cấu hình 5/15/30 giây. Publisher tạo trong phiên owner, không có cửa sổ. Bản cài thử lỗi ban đầu đã gỡ sạch, các lỗi native API được sửa và thêm test.
+- Pipe giữa owner và LocalService đã xác thực hai chiều và truyền hình thật. Hai Test Pattern cùng kết nối: 720p nhận 1.159 khung/60 giây (**19,32 fps**); 1080p nhận 976 khung/60,03 giây (**16,26 fps**). Cả hai `stale=0`, chọn nguồn và disconnect thành công. Đây là tốc độ đo đường nhận IPC, chưa đạt 25 khung mới/giây; output có thể lặp khung ở nhịp 25 fps. Chưa đo CPU/độ trễ end-to-end hoặc chạy dài hạn.
+- Lưu cấu hình DPAPI dưới LocalService thành công; kiểm tra owner đọc trực tiếp `cameras.dat` bị Access Denied. Probe service → OBS Virtual Camera 12 giây báo đang phát, process hoạt động, kết nối service thành công và dọn sạch khi dừng. Chưa xác nhận hình trong Meet/Zoom.
+- Stop thủ công giữ trạng thái Stopped sau 6 giây; Start lại đổi PID, pipe xác thực lại được và đọc nguyên cấu hình revision 5 từ DPAPI. Cả hai nguồn vẫn dừng đúng vì cấu hình thử nghiệm không bật auto-connect.
+- Còn cần nghiệm thu: boot trước logon, UAC bằng tài khoản quản trị khác, kill-host/SCM recovery thật, RTSP công ty mất mạng/kết nối lại, Meet/Zoom, máy không cài Python. Không xem unit/build hoặc cấu hình SCM là bằng chứng những mục này đã đạt.
 
 Hướng dẫn chạy/gỡ trong [SERVICE_PACKAGING.md](SERVICE_PACKAGING.md); các bước máy đích còn lại trong [MANUAL_TESTS.md](MANUAL_TESTS.md).
 
