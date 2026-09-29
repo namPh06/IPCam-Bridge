@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComb
     QVBoxLayout, QWidget)
 
 from .controller import ManagedProcess
+from .config import validate_rtsp_url
 from .frames import SharedFrame, status_frame
 from .output import run_output
 from .onvif_discovery import discover_onvif
@@ -46,6 +47,7 @@ class ServiceSession:
         self.output = ManagedProcess(mp.get_context('spawn'))
         self.output_message = 'Webcam ảo chưa bật.'
         self.want_output = None
+        self.output_running = False
         self.retry_at, self.attempt = 0, 0
         self.image = status_frame(1280, 720, 'DANG CHO SERVICE')
         self.image_at = time.monotonic()
@@ -167,6 +169,7 @@ class ServiceSession:
             elif self.window:
                 self.window.notice.setText(ERRORS.get(response.get('code'), 'Không thực hiện được yêu cầu.'))
                 self.window.busy = False
+                self.window.use_stage = None
         with self.lock:
             incoming, self.incoming = self.incoming, None
         if incoming and incoming[0] == self.pid:
@@ -176,9 +179,11 @@ class ServiceSession:
         was_active = self.output.active
         for state, message in self.output.poll():
             self.output_message = message
+            self.output_running = state == 'running'
             if state == 'running':
                 self.attempt = 0
         if was_active and not self.output.active:
+            self.output_running = False
             self.retry_at = time.monotonic() + (1, 2, 4, 8, 15, 30)[min(self.attempt, 5)]
             self.attempt += 1
         if self.pending_frame is not None and not self.output.active:
@@ -206,6 +211,7 @@ class ServiceSession:
 
     def stop_output(self):
         self.want_output = False
+        self.output_running = False
         self.output.stop()
         self.output_message = 'Webcam đã dừng. Service vẫn nhận camera.'
 
@@ -231,9 +237,11 @@ class ServiceWindow(QMainWindow):
     def __init__(self, session):
         super().__init__()
         self.session, self.config, self.index, self.busy = session, None, 0, False
+        self.use_stage = None
+        self.use_camera_id = None
         self.setWindowTitle('IP Camera Bridge — Windows Service')
-        self.resize(1100, 950)
-        self.setMinimumSize(900, 720)
+        self.resize(1050, 740)
+        self.setMinimumSize(800, 600)
         self.setStyleSheet('''
             QMainWindow { background: #f3f6fb; color: #172033; }
             QGroupBox { background: white; border: 1px solid #d8e0ec; border-radius: 8px;
@@ -267,7 +275,7 @@ class ServiceWindow(QMainWindow):
         heading = QLabel('IP Camera Bridge')
         heading.setObjectName('heading')
         layout.addWidget(heading)
-        subtitle = QLabel('Chọn camera  →  Kết nối nguồn  →  Phát qua OBS Virtual Camera')
+        subtitle = QLabel('Thêm camera → Kết nối và sử dụng → Chọn OBS Virtual Camera trong ứng dụng họp')
         subtitle.setObjectName('muted')
         layout.addWidget(subtitle)
 
@@ -275,37 +283,38 @@ class ServiceWindow(QMainWindow):
         camera_layout = QVBoxLayout(camera_box)
         row = QHBoxLayout()
         self.cameras = QComboBox()
-        self.cameras.setAccessibleName('Camera đang chỉnh sửa; camera đang xuất có dấu chọn')
+        self.cameras.setAccessibleName('Chọn camera; trạng thái phát được ghi cạnh tên')
         self.cameras.currentIndexChanged.connect(self.select_editor)
         row.addWidget(self.cameras, 1)
-        for label, callback in (('+ Thêm camera', self.add_camera), ('Quét camera LAN', self.scan_lan),
-                                ('Xóa camera', self.remove_camera)):
+        for label, callback in (('+ Thêm camera', self.add_camera), ('Quét camera LAN', self.scan_lan)):
             button = QPushButton(label)
             button.clicked.connect(callback)
             row.addWidget(button)
             if callback == self.scan_lan:
                 self.scan_button = button
         camera_layout.addLayout(row)
-        form = QGridLayout()
+        self.edit_button = QPushButton('Ẩn thông tin camera')
+        self.edit_button.setCheckable(True)
+        self.edit_button.setChecked(True)
+        self.editor = QWidget()
+        self.edit_button.toggled.connect(self.editor.setVisible)
+        self.edit_button.toggled.connect(lambda checked: self.edit_button.setText('Ẩn thông tin camera' if checked else 'Sửa thông tin camera'))
+        camera_layout.addWidget(self.edit_button)
+        form = QGridLayout(self.editor)
         form.setColumnStretch(1, 1)
         form.setColumnStretch(3, 1)
         self.name, self.address, self.username, self.password = (QLineEdit() for _ in range(4))
+        self.address.setPlaceholderText('rtsp://địa-chỉ-camera:554/đường-dẫn-stream')
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.password.setPlaceholderText('Nhập mật khẩu nguyên bản, không đổi @ thành %40')
-        self.replace_password = QCheckBox('Thay mật khẩu (để trống để xóa)')
-        self.password.setEnabled(False)
-        self.replace_password.toggled.connect(self.password.setEnabled)
+        self.password.setPlaceholderText('Để trống để giữ mật khẩu đã lưu')
+        self.password.setToolTip('Nhập mật khẩu nguyên bản, kể cả ký tự @. Để trống để giữ mật khẩu đã lưu.')
         self.keep_address = QCheckBox('Giữ địa chỉ đã lưu đang được che')
-        self.kind, self.resolution = QComboBox(), QComboBox()
-        for label, value in (('Test Pattern', 'test'), ('RTSP', 'rtsp'), ('Video File', 'file')):
-            self.kind.addItem(label, value)
+        self.resolution = QComboBox()
         for value in ('720p', '1080p'):
             self.resolution.addItem(value, value)
         form.addWidget(QLabel('Tên camera'), 0, 0)
-        form.addWidget(self.name, 0, 1)
-        form.addWidget(QLabel('Nguồn'), 0, 2)
-        form.addWidget(self.kind, 0, 3)
-        form.addWidget(QLabel('URL RTSP / file'), 1, 0)
+        form.addWidget(self.name, 0, 1, 1, 3)
+        form.addWidget(QLabel('URL RTSP'), 1, 0)
         form.addWidget(self.address, 1, 1, 1, 3)
         form.addWidget(self.keep_address, 2, 1, 1, 3)
         form.addWidget(QLabel('Tên đăng nhập'), 3, 0)
@@ -314,57 +323,57 @@ class ServiceWindow(QMainWindow):
         form.addWidget(self.password, 3, 3)
         form.addWidget(QLabel('Đầu ra 25 fps'), 4, 0)
         form.addWidget(self.resolution, 4, 1)
-        form.addWidget(self.replace_password, 4, 3)
-        camera_layout.addLayout(form)
-        self.auto = QCheckBox('Tự kết nối camera khi Windows khởi động; tự bật webcam sau đăng nhập')
-        camera_layout.addWidget(self.auto)
+        camera_layout.addWidget(self.editor)
+        self.auto = QCheckBox('Tự chạy khi đăng nhập Windows')
+        options = QHBoxLayout()
+        options.addWidget(self.auto, 1)
+        self.save_config_button = QPushButton('Lưu cấu hình')
+        self.save_config_button.setToolTip('Lưu thông tin camera và tùy chọn tự chạy, chưa kết nối.')
+        self.save_config_button.clicked.connect(self.save)
+        options.addWidget(self.save_config_button)
+        camera_layout.addLayout(options)
         row = QHBoxLayout()
-        self.save_button = QPushButton('Lưu cấu hình')
+        self.save_button = QPushButton('Kết nối và sử dụng')
         self.save_button.setObjectName('primaryButton')
-        self.save_button.clicked.connect(self.save)
-        self.output_select_button = QPushButton('Chọn camera này để xuất')
-        self.output_select_button.clicked.connect(self.select_output)
+        self.save_button.clicked.connect(self.use_camera)
         more = QPushButton('Tác vụ khác ▾')
         menu = QMenu(more)
+        menu.addAction('Thêm camera thử (Test Pattern)').triggered.connect(self.add_test_camera)
+        menu.addAction('Ngắt camera đang chọn').triggered.connect(lambda: self.selected_command('disconnect'))
+        menu.addAction('Kết nối / ngắt tất cả').triggered.connect(self.toggle_all)
+        menu.addAction('Xóa camera').triggered.connect(self.remove_camera)
+        menu.addAction('Xóa mật khẩu đã lưu').triggered.connect(self.clear_password)
         menu.addAction('Tải lại cấu hình').triggered.connect(self.reload)
         menu.addAction('Nhập camera từ bản desktop cũ').triggered.connect(self.migrate)
         more.setMenu(menu)
         row.addWidget(self.save_button, 1)
-        row.addWidget(self.output_select_button, 1)
         row.addWidget(more)
         camera_layout.addLayout(row)
         layout.addWidget(camera_box)
 
-        action_row = QHBoxLayout()
-        source_box = QGroupBox('2. Kết nối nguồn')
-        source_layout = QVBoxLayout(source_box)
-        self.source_status = QLabel('Chưa có trạng thái camera.')
+        status_box = QGroupBox('Trạng thái sử dụng')
+        status_layout = QVBoxLayout(status_box)
+        self.source_status = QLabel('Chọn camera rồi bấm Kết nối và sử dụng.')
         self.source_status.setWordWrap(True)
-        source_layout.addWidget(self.source_status)
-        source_buttons = QHBoxLayout()
-        self.connect_button = QPushButton('Kết nối camera đang chọn')
-        self.connect_button.setObjectName('primaryButton')
-        self.connect_button.clicked.connect(self.toggle_selected)
-        self.all_button = QPushButton('Kết nối tất cả')
-        self.all_button.clicked.connect(self.toggle_all)
-        source_buttons.addWidget(self.connect_button, 1)
-        source_buttons.addWidget(self.all_button)
-        source_layout.addLayout(source_buttons)
-        action_row.addWidget(source_box, 1)
-
-        output_box = QGroupBox('3. Phát vào ứng dụng họp')
-        output_layout = QVBoxLayout(output_box)
         self.output_status = QLabel('Webcam ảo chưa bật.')
         self.output_status.setWordWrap(True)
-        output_layout.addWidget(self.output_status)
-        self.output_button = QPushButton('Bật webcam ảo')
-        self.output_button.setObjectName('primaryButton')
+        status_layout.addWidget(self.source_status)
+        status_layout.addWidget(self.output_status)
+        controls = QHBoxLayout()
+        self.output_button = QPushButton('Dừng phát')
         self.output_button.clicked.connect(self.toggle_output)
-        output_layout.addWidget(self.output_button)
-        action_row.addWidget(output_box, 1)
-        layout.addLayout(action_row)
+        controls.addWidget(self.output_button)
+        self.preview_button = QPushButton('Xem hình camera')
+        self.preview_button.setCheckable(True)
+        controls.addWidget(self.preview_button)
+        controls.addStretch()
+        status_layout.addLayout(controls)
+        layout.addWidget(status_box)
 
         preview_box = QGroupBox('Xem trước camera đang xuất')
+        preview_box.hide()
+        self.preview_button.toggled.connect(preview_box.setVisible)
+        self.preview_button.toggled.connect(lambda checked: self.preview_button.setText('Ẩn hình camera' if checked else 'Xem hình camera'))
         preview_layout = QVBoxLayout(preview_box)
         self.preview, self.state, self.notice = QLabel(), QLabel(), QLabel()
         self.preview.setMinimumSize(320, 180)
@@ -381,6 +390,7 @@ class ServiceWindow(QMainWindow):
         guide.setWordWrap(True)
         guide.setStyleSheet('padding: 9px; color: #604600; background: #fff7d6; border: 1px solid #ead074; border-radius: 6px;')
         layout.addWidget(guide)
+        layout.addStretch()
         self.discovery_results = queue.Queue(1)
         self.discovery_timer = QTimer(self)
         self.discovery_timer.timeout.connect(self.finish_scan)
@@ -393,6 +403,10 @@ class ServiceWindow(QMainWindow):
                 camera['password'] = None
                 camera.pop('has_password', None)
                 camera.pop('address_hint', None)
+            if self.config['revision'] == 0 and len(self.config['cameras']) == 1:
+                first = self.config['cameras'][0]
+                if first['kind'] == 'test' and first['name'] == 'Camera 1':
+                    first['kind'] = 'rtsp'
             self.index = min(self.index, len(self.config['cameras']) - 1)
             self.populate()
             self.notice.setText('Đã tải cấu hình. Mật khẩu đã lưu không được trả về giao diện.')
@@ -400,36 +414,57 @@ class ServiceWindow(QMainWindow):
             # Selection persists independently; preserve unsaved form edits.
             self.config['revision'] = response['revision']
             self.config['selected_id'] = response['data']['config']['selected_id']
-        if command is not None:
+        if command not in (None, 'status') or (command == 'status' and self.use_stage is None):
             self.busy = False
-            if command in ('configure', 'migrate'):
-                self.session.want_output = self.auto.isChecked()
+        if self.use_stage == 'disconnecting' and command == 'disconnect':
+            self.use_stage = 'stopping'
+        if self.use_stage == 'stopping' and all(c['state'] == 'stopped' for c in response['data']['cameras'] if c['id'] in self.stop_ids):
+            self.use_stage = 'saving'
+            self.save()
+        elif self.use_stage == 'saving' and command == 'configure':
+            self.use_stage = 'connecting'
+            self.send('connect', camera_id=self.use_camera_id)
+            self.notice.setText('Đã lưu. Đang kết nối camera…')
+        elif self.use_stage == 'connecting' and command == 'connect':
+            self.use_stage = 'waiting'
+        if self.use_stage == 'waiting':
+            camera = next((c for c in response['data']['cameras'] if c['id'] == self.use_camera_id), None)
+            if camera and camera['state'] == 'connected':
+                self.session.start_output()
+                self.use_stage = None
+                self.edit_button.setChecked(False)
+                self.notice.setText('Đã kết nối. Đang khởi động webcam ảo…')
+            elif camera:
+                self.notice.setText(camera['message'])
+                if camera['state'] in ('error', 'failed', 'retrying', 'lost'):
+                    self.use_stage = None
+                    self.edit_button.setChecked(True)
 
     def capture(self):
         if not self.config:
             return
         camera = self.config['cameras'][self.index]
-        camera.update(name=self.name.text().strip(), kind=self.kind.currentData(), username=self.username.text(),
+        camera.update(name=self.name.text().strip(), username=self.username.text(),
                       address=None if self.keep_address.isChecked() else self.address.text().strip(),
-                      password=self.password.text() if self.replace_password.isChecked() else camera['password'])
+                      password=self.password.text() or camera['password'])
+        if camera['address'] and camera['address'].lower().startswith(('rtsp://', 'rtsps://')):
+            camera['kind'] = 'rtsp'
         self.config['resolution'], self.config['auto_connect'] = self.resolution.currentData(), self.auto.isChecked()
 
     def populate(self):
         self.cameras.blockSignals(True)
         self.cameras.clear()
-        self.cameras.addItems([camera['name'] + ('  ✓ ĐANG XUẤT' if camera['id'] == self.config['selected_id'] else '')
+        self.cameras.addItems([camera['name'] + (' · Đầu ra đã chọn' if camera['id'] == self.config['selected_id'] else '')
                                for camera in self.config['cameras']])
         self.cameras.setCurrentIndex(self.index)
         self.cameras.blockSignals(False)
         camera = self.config['cameras'][self.index]
         self.name.setText(camera['name'])
-        self.kind.setCurrentIndex(self.kind.findData(camera['kind']))
         self.address.setText(camera['address'] or '')
         self.keep_address.setVisible(camera['address'] is None)
         self.keep_address.setChecked(camera['address'] is None)
         self.username.setText(camera['username'])
         self.password.setText(camera['password'] or '')
-        self.replace_password.setChecked(camera['password'] is not None)
         self.resolution.setCurrentIndex(self.resolution.findData(self.config['resolution']))
         self.auto.setChecked(self.config['auto_connect'])
 
@@ -440,16 +475,67 @@ class ServiceWindow(QMainWindow):
             self.populate()
 
     def add_camera(self):
-        if not self.config or len(self.config['cameras']) >= MAX_CAMERAS:
+        if self.busy or self.use_stage or not self.config or len(self.config['cameras']) >= MAX_CAMERAS:
             return
         self.capture()
+        if self.config['revision'] == 0 and len(self.config['cameras']) == 1 and self.config['cameras'][0]['kind'] == 'rtsp' and not self.config['cameras'][0]['address']:
+            self.edit_button.setChecked(True)
+            self.address.setFocus()
+            return
         self.config['cameras'].append({'id': str(uuid4()), 'name': f'Camera {len(self.config["cameras"]) + 1}',
-            'kind': 'test', 'address': '', 'username': '', 'password': ''})
+            'kind': 'rtsp', 'address': '', 'username': '', 'password': ''})
         self.index = len(self.config['cameras']) - 1
         self.populate()
+        self.edit_button.setChecked(True)
+
+    def add_test_camera(self):
+        if self.busy or self.use_stage or not self.config or len(self.config['cameras']) >= MAX_CAMERAS:
+            return
+        if not (self.config['revision'] == 0 and len(self.config['cameras']) == 1 and not self.address.text()):
+            self.add_camera()
+        self.config['cameras'][self.index].update(kind='test', name='Camera thử (Test Pattern)')
+        self.populate()
+
+    def clear_password(self):
+        if self.config and not self.busy and not self.use_stage:
+            self.password.clear()
+            self.config['cameras'][self.index]['password'] = ''
+            self.notice.setText('Mật khẩu sẽ được xóa khi lưu hoặc bấm Kết nối và sử dụng.')
+
+    def use_camera(self):
+        if self.config and not self.busy:
+            self.capture()
+            for camera in self.config['cameras']:
+                if camera['kind'] == 'rtsp' and camera['address'] is not None:
+                    try:
+                        validate_rtsp_url(camera['address'])
+                    except ValueError:
+                        self.notice.setText('URL RTSP không hợp lệ. Nhập rtsp://địa-chỉ-camera:554/đường-dẫn-stream.')
+                        self.edit_button.setChecked(True)
+                        self.address.setFocus()
+                        return
+            self.use_camera_id = self.config['cameras'][self.index]['id']
+            self.config['selected_id'] = self.use_camera_id
+            original = self.session.status['data']['config'] if self.session.status else None
+            previous = {c['id']: c for c in original['cameras']} if original else {}
+            self.stop_ids = set()
+            for camera in self.config['cameras']:
+                old = previous.get(camera['id'])
+                if old and (self.config['resolution'] != original['resolution'] or
+                        any(camera[k] is not None and camera[k] != old.get(k) for k in ('kind', 'address', 'username', 'password'))):
+                    self.stop_ids.add(camera['id'])
+            # Disconnect all only for a shared resolution change; otherwise stop the edited source.
+            if self.stop_ids:
+                self.use_stage = 'disconnecting'
+                self.send('disconnect', camera_id=next(iter(self.stop_ids)) if len(self.stop_ids) == 1 else None)
+            else:
+                self.use_stage = 'saving'
+                self.save()
+            if not self.busy:
+                self.use_stage = None
 
     def scan_lan(self):
-        if not self.config or self.discovery_timer.isActive():
+        if self.busy or self.use_stage or not self.config or self.discovery_timer.isActive():
             return
         self.scan_button.setEnabled(False)
         self.notice.setText('Đang quét camera ONVIF trong LAN…')
@@ -497,12 +583,19 @@ class ServiceWindow(QMainWindow):
             return
         self.capture()
         added = 0
+        empty_first = self.config['revision'] == 0 and len(self.config['cameras']) == 1 and self.config['cameras'][0]['kind'] == 'rtsp' and not self.config['cameras'][0]['address']
         addresses = {camera.get('address') for camera in self.config['cameras']}
         for item in choices.selectedItems():
             if len(self.config['cameras']) >= MAX_CAMERAS:
                 break
             device = item.data(Qt.ItemDataRole.UserRole)
             if device.rtsp_url in addresses:
+                continue
+            if empty_first:
+                self.config['cameras'][0].update(name=device.name, address=device.rtsp_url)
+                addresses.add(device.rtsp_url)
+                added += 1
+                empty_first = False
                 continue
             self.config['cameras'].append({'id': str(uuid4()), 'name': device.name, 'kind': 'rtsp',
                 'address': device.rtsp_url, 'username': '', 'password': ''})
@@ -511,12 +604,13 @@ class ServiceWindow(QMainWindow):
         if added:
             self.index = len(self.config['cameras']) - 1
             self.populate()
-            self.notice.setText(f'Đã thêm {added} camera. Hoàn thiện đường dẫn RTSP và thông tin đăng nhập rồi bấm Lưu cấu hình.')
+            self.edit_button.setChecked(True)
+            self.notice.setText(f'Đã thêm {added} camera. Hoàn thiện đường dẫn RTSP và thông tin đăng nhập rồi bấm Kết nối và sử dụng.')
         else:
             self.notice.setText('Các camera đã chọn đã có trong danh sách hoặc danh sách đã đủ 16 camera.')
 
     def remove_camera(self):
-        if self.config and len(self.config['cameras']) > 1:
+        if not self.busy and not self.use_stage and self.config and len(self.config['cameras']) > 1:
             self.capture()
             removed = self.config['cameras'].pop(self.index)
             self.index = min(self.index, len(self.config['cameras']) - 1)
@@ -535,36 +629,29 @@ class ServiceWindow(QMainWindow):
             self.send('configure', update=self.config)
 
     def selected_command(self, command):
+        if command == 'disconnect':
+            self.use_stage = None
         if self.config:
             self.send(command, camera_id=self.config['cameras'][self.index]['id'])
-
-    def selected_status(self):
-        if not self.config or not self.session.status:
-            return None
-        camera_id = self.config['cameras'][self.index]['id']
-        return next((camera for camera in self.session.status['data']['cameras'] if camera['id'] == camera_id), None)
-
-    def toggle_selected(self):
-        camera = self.selected_status()
-        self.selected_command('disconnect' if camera and camera.get('wanted') else 'connect')
 
     def toggle_all(self):
         cameras = self.session.status['data']['cameras'] if self.session.status else []
         self.send('disconnect' if any(camera.get('wanted') for camera in cameras) else 'connect', camera_id=None)
 
     def toggle_output(self):
+        if self.use_stage:
+            self.use_stage = None
+            self.notice.setText('Đã hủy thao tác sử dụng camera.')
+            return
+        self.use_stage = None
         if self.session.want_output:
             self.session.stop_output()
         else:
             self.session.start_output()
 
-    def select_output(self):
-        if self.config:
-            self.capture()
-            self.config['selected_id'] = self.config['cameras'][self.index]['id']
-            self.save()
-
     def reload(self):
+        if self.busy or self.use_stage:
+            return
         self.config = None
         self.send('status')
 
@@ -572,50 +659,40 @@ class ServiceWindow(QMainWindow):
         self.send('migrate')
 
     def refresh(self):
-        rgb = self.session.image
-        image = QImage(rgb.data, rgb.shape[1], rgb.shape[0], rgb.strides[0], QImage.Format.Format_RGB888).copy()
-        self.preview.setPixmap(QPixmap.fromImage(image).scaled(self.preview.size(), Qt.AspectRatioMode.KeepAspectRatio))
-        cameras = self.session.status['data']['cameras'] if self.session.status else []
-        selected = self.selected_status()
-        selected_id = self.config['selected_id'] if self.config else None
-        output_name = next((camera['name'] for camera in self.config['cameras'] if camera['id'] == selected_id), 'Chưa chọn') if self.config else 'Chưa chọn'
-        if selected:
-            self.source_status.setText(f'{selected["message"]}  ·  {selected["fps"]} fps')
-            source_color = '#176b3a' if selected['state'] == 'connected' else ('#8a5a00' if selected.get('wanted') else '#a1261d')
-            self.source_status.setStyleSheet(f'color: {source_color}; font-weight: 600;')
-            self.connect_button.setText('Ngắt camera đang chọn' if selected.get('wanted') else 'Kết nối camera đang chọn')
-            self.connect_button.setObjectName('stopButton' if selected.get('wanted') else 'primaryButton')
-        else:
-            self.source_status.setText('Camera mới chưa được lưu. Hãy lưu cấu hình trước khi kết nối.')
-            self.source_status.setStyleSheet('color: #8a5a00; font-weight: 600;')
-        any_wanted = any(camera.get('wanted') for camera in cameras)
-        self.all_button.setText('Ngắt tất cả' if any_wanted else 'Kết nối tất cả')
-        self.output_status.setText(f'Camera xuất: {output_name}\n{self.session.output_message}')
-        output_wanted = bool(self.session.want_output)
-        output_color = '#176b3a' if self.session.output.active else ('#8a5a00' if output_wanted else '#5d6b80')
-        self.output_status.setStyleSheet(f'color: {output_color}; font-weight: 600;')
-        self.output_button.setText('Dừng webcam ảo' if output_wanted else 'Bật webcam ảo')
-        self.output_button.setObjectName('stopButton' if output_wanted else 'primaryButton')
-        current_id = self.config['cameras'][self.index]['id'] if self.config else None
-        is_output = current_id == selected_id
-        self.output_select_button.setText('✓ Camera đang xuất' if is_output else 'Chọn camera này để xuất')
-        self.output_select_button.setEnabled(not is_output and not self.busy)
-        self.connect_button.setEnabled(bool(selected) and not self.busy)
-        self.all_button.setEnabled(bool(cameras) and not self.busy)
-        self.output_button.setEnabled(bool(self.session.status))
-        self.save_button.setEnabled(bool(self.config) and not self.busy)
-        for button in (self.connect_button, self.output_button):
-            button.style().unpolish(button)
-            button.style().polish(button)
-        lines = []
-        for profile, camera in zip(self.config['cameras'] if self.config else [], cameras):
-            marker = 'ĐANG XUẤT · ' if camera['id'] == selected_id else ''
-            lines.append(f'{marker}{profile["name"]}: {camera["message"]} ({camera["fps"]} fps)')
-        self.state.setText('\n'.join(lines))
+        if self.preview.isVisible():
+            rgb = self.session.image
+            image = QImage(rgb.data, rgb.shape[1], rgb.shape[0], rgb.strides[0], QImage.Format.Format_RGB888).copy()
+            self.preview.setPixmap(QPixmap.fromImage(image).scaled(self.preview.size(), Qt.AspectRatioMode.KeepAspectRatio))
+        data = self.session.status['data'] if self.session.status else None
+        selected_id = data['config']['selected_id'] if data else None
+        camera = next((c for c in data['cameras'] if c['id'] == selected_id), None) if data else None
+        name = next((c['name'] for c in data['config']['cameras'] if c['id'] == selected_id), 'Chưa chọn') if data else 'Chưa chọn'
+        connected = bool(camera and camera['state'] == 'connected')
+        running = bool(self.session.output_running and connected and self.session.want_output)
+        self.source_status.setText(f'Camera đầu ra: {name}\nKết nối: {camera["message"]} · {camera["fps"]} fps' if camera else 'Chưa kết nối được dịch vụ camera.')
+        self.source_status.setStyleSheet('color: #176b3a;' if connected else 'color: #8a5a00;')
+        self.output_status.setText('Đang phát qua OBS Virtual Camera. Chọn thiết bị này trong Meet / Zoom.' if running else self.session.output_message)
+        if running and self.notice.text() == 'Đã kết nối. Đang khởi động webcam ảo…':
+            self.notice.setText('Sẵn sàng sử dụng trong Meet / Zoom.')
+        self.output_status.setStyleSheet('color: #176b3a; font-weight: 600;' if running else 'color: #5d6b80;')
+        self.output_button.setVisible(bool(self.session.want_output or self.use_stage))
+        self.output_button.setText('Hủy kết nối' if self.use_stage else 'Dừng phát')
+        self.save_button.setText('Đang lưu…' if self.busy else ('Đang kết nối…' if self.use_stage else 'Kết nối và sử dụng'))
+        self.save_button.setEnabled(bool(self.config) and not self.busy and not self.use_stage)
+        self.save_config_button.setEnabled(bool(self.config) and not self.busy and not self.use_stage)
+        self.auto.setEnabled(not self.busy and not self.use_stage)
+        self.editor.setEnabled(not self.busy and not self.use_stage)
+        self.cameras.setEnabled(not self.busy and not self.use_stage)
+        for index in range(self.cameras.count() if self.config else 0):
+            profile = self.config['cameras'][index]
+            suffix = (' · Đang phát' if running else ' · Đầu ra đã chọn') if profile['id'] == selected_id else ''
+            self.cameras.setItemText(index, profile['name'] + suffix)
+        self.state.setText(f'Hình từ camera đầu ra: {name}')
 
     def closeEvent(self, event):
         event.ignore()
         # Never persist an unfinished form or stop the service when hiding the window.
+        self.use_stage = None
         self.config = None
         self.password.clear()
         self.hide()

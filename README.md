@@ -4,7 +4,7 @@
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows11&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.3.1-2E8B57)
+![Version](https://img.shields.io/badge/version-0.3.3-2E8B57)
 ![Tests](https://img.shields.io/badge/tests-78%20passed-brightgreen)
 
 IP Camera Bridge nhận hình ảnh từ RTSP, video hoặc Test Pattern, hiển thị preview và xuất một camera đã chọn qua thiết bị **OBS Virtual Camera**. Ứng dụng hỗ trợ tối đa 16 nguồn, tự kết nối lại khi mất mạng và có thể hoạt động nền cùng Windows.
@@ -76,7 +76,9 @@ Máy sử dụng bộ cài không cần cài Python. Bộ cài có tùy chọn c
 2. Mở file theo cách bình thường, không chọn **Run as administrator**.
 3. Chọn **Yes** khi Windows yêu cầu quyền quản trị.
 4. Nếu máy chưa có OBS, giữ tùy chọn **Cài OBS Studio**.
-5. Sau khi cài xong, mở **Start → IP Camera Bridge**.
+5. Trang hoàn tất thông báo cài đặt thành công. Giữ **Mở IP Camera Bridge ngay** rồi bấm **Finish**, hoặc mở biểu tượng **IP Camera Bridge** trên Desktop.
+
+Bộ cài tạo biểu tượng IP Camera Bridge trên Desktop. Khi cài kèm OBS, biểu tượng OBS mới tạo được dọn khỏi Desktop; biểu tượng OBS đã có từ trước được giữ nguyên.
 
 > [!WARNING]
 > Bộ cài hiện chưa có chữ ký số của nhà phát hành. Windows SmartScreen có thể yêu cầu chọn **More info → Run anyway**. Chỉ chạy file nhận từ nguồn bạn tin tưởng và có SHA-256 khớp với file `.sha256` đi kèm.
@@ -96,16 +98,17 @@ Gỡ ứng dụng trong **Settings → Apps → Installed apps**. OBS Studio là
 
 ## Thiết lập lần đầu
 
-Nên kiểm tra bằng Test Pattern trước khi kết nối camera thật:
+1. **Thêm camera:** quét LAN hoặc nhập URL RTSP, tên đăng nhập và mật khẩu riêng.
+2. **Kết nối và sử dụng:** tool lưu cấu hình, kết nối camera rồi tự bật webcam ảo khi đã nhận hình.
+3. **Trong Meet / Zoom:** chọn **OBS Virtual Camera**.
 
-1. Mở **IP Camera Bridge** từ Start.
-2. Chọn camera `Test Pattern 1`.
-3. Bấm **Kết nối camera đang chọn** và kiểm tra preview có hình chuyển động.
-4. Bấm **Chọn camera này để xuất**. Camera đang dùng sẽ có dấu **✓ ĐANG XUẤT**.
-5. Bấm **Bật webcam ảo**.
-6. Mở Google Meet hoặc Zoom và chọn **OBS Virtual Camera**.
+Bật **Tự chạy khi đăng nhập Windows** trước khi bấm **Kết nối và sử dụng** để ghi nhớ lựa chọn. Service nhận camera khi Windows khởi động; bộ phát chạy sau đăng nhập.
 
-Nếu Test Pattern hoạt động trong cuộc họp, đường xuất webcam đã sẵn sàng. Tiếp theo có thể quét LAN hoặc nhập RTSP thủ công.
+Màn hình chính hiển thị trạng thái camera và webcam. **Đầu ra đã chọn** chỉ là lựa chọn nguồn; **Đang phát** chỉ hiện sau khi bộ phát báo hoạt động và nguồn đã kết nối. Bấm **Xem hình camera** khi cần kiểm tra hình, preview mặc định được ẩn.
+
+Ô mật khẩu luôn nhập được. Để trống sẽ giữ mật khẩu cũ; nhập mới sẽ thay mật khẩu khi lưu. Muốn xóa mật khẩu, dùng **Tác vụ khác → Xóa mật khẩu đã lưu**, sau đó lưu.
+
+Không có mạng camera? Dùng **Tác vụ khác → Thêm camera thử (Test Pattern)** rồi **Kết nối và sử dụng**. Khi thêm camera thật, RTSP là nguồn mặc định.
 
 ## Quét camera trong LAN
 
@@ -115,10 +118,9 @@ Nút **Quét camera LAN** nằm trong phần **1. Chọn và cấu hình camera*
 2. Bấm **Quét camera LAN** và chờ khoảng vài giây.
 3. Chọn một hoặc nhiều camera ONVIF trong danh sách.
 4. Bấm **OK** để thêm các camera đã chọn.
-5. Chọn từng camera và hoàn thiện trường **URL RTSP / file**.
-6. Chọn nguồn **RTSP**, nhập tên đăng nhập và mật khẩu.
-7. Bấm **Lưu cấu hình**.
-8. Bấm **Kết nối camera đang chọn** để kiểm tra preview.
+5. Chọn từng camera và hoàn thiện trường **URL RTSP**.
+6. Nhập tên đăng nhập và mật khẩu.
+7. Bấm **Kết nối và sử dụng**. Nếu cần xem hình, bấm **Xem hình camera**.
 
 WS-Discovery thường chỉ xác định được thiết bị và địa chỉ IP. Đường dẫn stream RTSP phụ thuộc hãng camera nên vẫn cần kiểm tra tài liệu của camera. Ví dụ:
 
@@ -137,7 +139,7 @@ Nếu không tìm thấy camera:
 
 1. Bấm **Thêm**.
 2. Đặt **Tên camera** dễ nhận biết.
-3. Trong **Nguồn**, chọn `RTSP`.
+3. RTSP được chọn mặc định, không cần chọn loại nguồn.
 4. Nhập URL không chứa thông tin đăng nhập:
 
    ```text
@@ -146,7 +148,7 @@ Nếu không tìm thấy camera:
 
 5. Nhập **Tên đăng nhập** và **Mật khẩu** vào hai ô riêng.
 6. Chọn `720p` hoặc `1080p` tại **Đầu ra 25 fps**.
-7. Bấm **Lưu cấu hình**, sau đó bấm **Kết nối camera đang chọn**.
+7. Bấm **Kết nối và sử dụng**.
 
 Nhập mật khẩu ở dạng nguyên bản. Ví dụ, nếu mật khẩu chứa `@`, hãy nhập ký tự `@`; không đổi thành `%40`. Ứng dụng tự mã hóa ký tự đặc biệt đúng một lần khi tạo URL nội bộ.
 
@@ -156,10 +158,10 @@ Nhập mật khẩu ở dạng nguyên bản. Ví dụ, nếu mật khẩu chứ
 ## Sử dụng nhiều camera
 
 - Bấm **+ Thêm camera** hoặc **Quét camera LAN** để tạo tối đa 16 camera.
-- Bấm **Kết nối tất cả** để nhận đồng thời các nguồn đã lưu.
-- Chọn camera trong danh sách rồi bấm **Chọn camera này để xuất** để chuyển hình đưa vào webcam ảo.
+- Vào **Tác vụ khác → Kết nối / ngắt tất cả** để nhận đồng thời các nguồn đã lưu.
+- Chọn camera trong danh sách rồi bấm **Kết nối và sử dụng** để chuyển hình đưa vào webcam ảo.
 - Google Meet/Zoom vẫn sử dụng cùng một thiết bị **OBS Virtual Camera** khi chuyển camera.
-- Nút **Kết nối camera đang chọn** tự đổi thành **Ngắt camera đang chọn** khi nguồn đang chạy. Nút **Kết nối tất cả** cũng tự đổi thành **Ngắt tất cả**.
+- Các thao tác ngắt nguồn, kết nối/ngắt tất cả, xóa camera và lưu riêng nằm trong **Tác vụ khác**.
 
 Ứng dụng xuất một camera tại một thời điểm. Các camera còn lại có thể tiếp tục kết nối để chuyển nguồn nhanh, tùy khả năng CPU và mạng của máy.
 
@@ -167,7 +169,7 @@ Nhập mật khẩu ở dạng nguyên bản. Ví dụ, nếu mật khẩu chứ
 
 ### Google Meet
 
-1. Bấm **Bật webcam ảo** trong IP Camera Bridge.
+1. Bấm **Kết nối và sử dụng** trong IP Camera Bridge.
 2. Mở Google Meet.
 3. Chọn **Tùy chọn khác → Cài đặt → Video**.
 4. Tại **Máy ảnh**, chọn `OBS Virtual Camera`.
@@ -177,7 +179,7 @@ Nếu vừa cài OBS khi Chrome đang mở, hãy đóng toàn bộ cửa sổ Ch
 
 ### Zoom
 
-1. Bấm **Bật webcam ảo** trong IP Camera Bridge.
+1. Bấm **Kết nối và sử dụng** trong IP Camera Bridge.
 2. Mở **Zoom → Settings → Video**.
 3. Chọn `OBS Virtual Camera` trong danh sách Camera.
 4. Chọn microphone riêng trong **Audio**.
@@ -189,10 +191,10 @@ Một số ứng dụng chỉ đọc danh sách camera lúc khởi động. Nế
 Đánh dấu:
 
 ```text
-Tự kết nối camera khi Windows khởi động; tự bật webcam sau đăng nhập
+Tự chạy khi đăng nhập Windows
 ```
 
-Sau đó bấm **Lưu cấu hình**.
+Sau đó bấm **Kết nối và sử dụng** hoặc **Tác vụ khác → Lưu cấu hình, chưa kết nối**.
 
 - Service `IPCameraBridgeCapture` tự chạy từ lúc Windows khởi động.
 - Camera được kết nối nền theo cấu hình đã lưu.
@@ -221,7 +223,7 @@ Biểu tượng ở khay hệ thống cho phép mở quản lý, bật/dừng we
 
 | Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
-| Không có nút **Quét camera LAN** | Đang chạy bản cũ | Gỡ bản cũ nhưng giữ dữ liệu, sau đó cài bản 0.3.1 trở lên. |
+| Không có nút **Quét camera LAN** | Đang chạy bản cũ | Gỡ bản cũ nhưng giữ dữ liệu, sau đó cài bản 0.3.2 trở lên. |
 | Quét LAN không thấy camera | ONVIF discovery bị tắt, khác VLAN hoặc firewall chặn multicast | Bật ONVIF/WS-Discovery, kiểm tra mạng Private và thử nhập RTSP thủ công. |
 | Camera từ chối xác thực `401` | Sai tài khoản, mật khẩu hoặc quyền stream | Kiểm tra lại bằng VLC; nhập URL, username và mật khẩu vào ba ô riêng. |
 | Mật khẩu có `@` không kết nối | Mật khẩu đã được mã hóa thủ công | Nhập `@` nguyên bản, không nhập `%40`. |

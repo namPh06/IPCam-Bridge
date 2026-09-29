@@ -1,5 +1,5 @@
 #define AppName "IP Camera Bridge"
-#define AppVersion "0.3.1"
+#define AppVersion "0.3.3"
 #define OBSInstaller "OBS-Studio-32.2.2-Windows-x64-Installer.exe"
 
 [Setup]
@@ -28,7 +28,7 @@ WizardStyle=modern
 CloseApplications=no
 RestartApplications=no
 RestartIfNeededByRun=no
-DisableFinishedPage=yes
+DisableFinishedPage=no
 SetupLogging=yes
 
 [Files]
@@ -41,11 +41,29 @@ Name: "installobs"; Description: "Cài OBS Studio 32.2.2 (cung cấp thiết b�
 
 [Icons]
 Name: "{commonprograms}\{#AppName}"; Filename: "{app}\IPCameraBridge.exe"; Check: IsAdminInstallMode
+Name: "{commondesktop}\{#AppName}"; Filename: "{app}\IPCameraBridge.exe"; Check: IsAdminInstallMode
+
+[Messages]
+FinishedHeadingLabel=Đã cài đặt IP Camera Bridge thành công
+FinishedLabel=IP Camera Bridge đã được cài đặt. Bạn có thể mở ứng dụng từ biểu tượng trên Desktop để thêm camera và kết nối.
+
+[Run]
+Filename: "{commonpf64}\IPCameraBridge\IPCameraBridge.exe"; Description: "Mở IP Camera Bridge ngay"; Flags: postinstall nowait skipifsilent; Check: IsUserSetup
 
 [Code]
 var
   OwnerPID: Integer;
   InstallFailed: Boolean;
+
+function IsUserSetup: Boolean;
+begin
+  Result := not IsAdminInstallMode;
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := IsAdminInstallMode and (PageID = wpFinished);
+end;
 
 function GetCustomSetupExitCode: Integer;
 begin
@@ -131,6 +149,8 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   Code: Integer;
   Params: String;
+  OBSCommonShortcut, OBSUserShortcut: String;
+  HadOBSCommonShortcut, HadOBSUserShortcut: Boolean;
 begin
   if (CurStep = ssInstall) and not IsAdminInstallMode then begin
     { Inno permits relaunching Setup only after ssInstall. This outer process
@@ -153,11 +173,18 @@ begin
     if Code <> 0 then
       RaiseException('Service registration failed. Camera data was preserved.');
     if ShouldInstallOBS then begin
+      OBSCommonShortcut := ExpandConstant('{commondesktop}\OBS Studio.lnk');
+      OBSUserShortcut := ExpandConstant('{userdesktop}\OBS Studio.lnk');
+      HadOBSCommonShortcut := FileExists(OBSCommonShortcut);
+      HadOBSUserShortcut := FileExists(OBSUserShortcut);
       if not Exec(ExpandConstant('{tmp}\{#OBSInstaller}'), '/S',
                   ExpandConstant('{tmp}'), SW_HIDE, ewWaitUntilTerminated, Code) then
         SuppressibleMsgBox('IP Camera Bridge was installed, but the optional OBS Studio installer could not start. Install OBS Studio separately.', mbError, MB_OK, IDOK)
       else if Code <> 0 then
         SuppressibleMsgBox('IP Camera Bridge was installed, but OBS Studio installation failed. Install OBS Studio separately.', mbError, MB_OK, IDOK);
+      { Remove only shortcuts created by the bundled installation. }
+      if not HadOBSCommonShortcut then DeleteFile(OBSCommonShortcut);
+      if not HadOBSUserShortcut then DeleteFile(OBSUserShortcut);
     end;
     InstallFailed := False;
   end;

@@ -83,12 +83,58 @@ class SessionTests(unittest.TestCase):
             session.open_window()
             session.window.receive(response)
             session.window.refresh()
-            self.assertIn('ĐANG XUẤT', session.window.cameras.itemText(0))
-            self.assertEqual(session.window.output_select_button.text(), '✓ Camera đang xuất')
-            self.assertEqual(session.window.connect_button.text(), 'Ngắt camera đang chọn')
-            self.assertEqual(session.window.output_button.text(), 'Bật webcam ảo')
-            session.window.toggle_selected()
-            self.assertEqual(session.commands.get_nowait()['command'], 'disconnect')
+            window = session.window
+            self.assertNotIn('Đang phát', window.cameras.itemText(0))
+            self.assertTrue(window.password.isEnabled())
+            self.assertFalse(window.preview.isVisible())
+            window.password.setText('sample@password')
+            window.capture()
+            self.assertEqual(window.config['cameras'][0]['password'], 'sample@password')
+            window.password.clear()
+            window.capture()
+            self.assertEqual(window.config['cameras'][0]['password'], 'sample@password')
+            window.use_camera()
+            command = session.commands.get_nowait()
+            self.assertEqual(command['command'], 'disconnect')
+            response['_command'] = 'disconnect'
+            response['data']['cameras'][0]['state'] = 'stopped'
+            window.receive(response)
+            command = session.commands.get_nowait()
+            self.assertEqual(command['command'], 'configure')
+            self.assertFalse(session.want_output)
+            response['_command'] = 'configure'
+            window.receive(response)
+            self.assertEqual(session.commands.get_nowait(), {'command': 'connect', 'camera_id': camera_id})
+            self.assertFalse(session.want_output)
+            response['_command'] = 'connect'
+            response['data']['cameras'][0]['state'] = 'connecting'
+            window.receive(response)
+            self.assertFalse(session.want_output)
+            response['_command'] = 'status'
+            response['data']['cameras'][0]['state'] = 'connected'
+            window.receive(response)
+            self.assertTrue(session.want_output)
+            self.assertFalse(window.edit_button.isChecked())
+            session.output_running = True
+            window.refresh()
+            self.assertIn('Đang phát', window.cameras.itemText(0))
+            window.add_camera()
+            self.assertEqual(window.config['cameras'][-1]['kind'], 'rtsp')
+            window.clear_password()
+            window.capture()
+            self.assertEqual(window.config['cameras'][-1]['password'], '')
+            session.stop_output()
+            window.use_stage = 'waiting'
+            window.toggle_output()
+            self.assertIsNone(window.use_stage)
+            self.assertFalse(session.want_output)
+            window.use_stage = 'waiting'
+            response['data']['cameras'][0]['state'] = 'error'
+            window.receive(response)
+            self.assertIsNone(window.use_stage)
+            self.assertFalse(session.want_output)
+            window.reload()
+            window.refresh()  # Reload may temporarily have no form config.
         finally:
             session.close()
 
