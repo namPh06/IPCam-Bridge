@@ -18,7 +18,8 @@ from .controller import ManagedProcess
 from .config import validate_rtsp_url
 from .frames import SharedFrame, status_frame
 from .output import run_output
-from .onvif_discovery import discover_onvif
+from .onvif_discovery import discover_onvif, local_interfaces, scan_network, scan_rtsp
+from .rtsp_address import DEFAULT_PATH, expand_rtsp_address
 from .service_config import migrate_profiles
 from .service_ipc import ServiceClient
 from .windows_settings import MAX_CAMERAS, load_profiles, set_startup
@@ -243,6 +244,8 @@ class ServiceWindow(QMainWindow):
         self.resize(1050, 740)
         self.setMinimumSize(800, 600)
         self.setStyleSheet('''
+            QWidget { color: #172033; }
+            QDialog, QMenu, QListWidget, QComboBox QAbstractItemView { background: #ffffff; color: #172033; }
             QMainWindow { background: #f3f6fb; color: #172033; }
             QGroupBox { background: white; border: 1px solid #d8e0ec; border-radius: 8px;
                         margin-top: 12px; padding: 14px 10px 10px; font-weight: 600; }
@@ -267,6 +270,8 @@ class ServiceWindow(QMainWindow):
         scroll.setStyleSheet('QScrollArea { border: 0; background: #f3f6fb; }')
         self.setCentralWidget(scroll)
         body = QWidget()
+        body.setObjectName('pageBody')
+        body.setStyleSheet('QWidget#pageBody { background: #f3f6fb; }')
         scroll.setWidget(body)
         layout = QVBoxLayout(body)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
@@ -304,7 +309,8 @@ class ServiceWindow(QMainWindow):
         form.setColumnStretch(1, 1)
         form.setColumnStretch(3, 1)
         self.name, self.address, self.username, self.password = (QLineEdit() for _ in range(4))
-        self.address.setPlaceholderText('rtsp://địa-chỉ-camera:554/đường-dẫn-stream')
+        self.address.setPlaceholderText('192.168.100.77 hoặc URL RTSP đầy đủ')
+        self.address.editingFinished.connect(self.expand_address)
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.password.setPlaceholderText('Để trống để giữ mật khẩu đã lưu')
         self.password.setToolTip('Nhập mật khẩu nguyên bản, kể cả ký tự @. Để trống để giữ mật khẩu đã lưu.')
@@ -314,7 +320,7 @@ class ServiceWindow(QMainWindow):
             self.resolution.addItem(value, value)
         form.addWidget(QLabel('Tên camera'), 0, 0)
         form.addWidget(self.name, 0, 1, 1, 3)
-        form.addWidget(QLabel('URL RTSP'), 1, 0)
+        form.addWidget(QLabel('IP / URL RTSP'), 1, 0)
         form.addWidget(self.address, 1, 1, 1, 3)
         form.addWidget(self.keep_address, 2, 1, 1, 3)
         form.addWidget(QLabel('Tên đăng nhập'), 3, 0)
@@ -323,14 +329,20 @@ class ServiceWindow(QMainWindow):
         form.addWidget(self.password, 3, 3)
         form.addWidget(QLabel('Đầu ra 25 fps'), 4, 0)
         form.addWidget(self.resolution, 4, 1)
+        self.rtsp_path = QLineEdit(DEFAULT_PATH)
+        self.rtsp_path.setToolTip('Mẫu i-PRO / Panasonic. Đổi đường dẫn theo model nếu dùng camera khác. URL đầy đủ được giữ nguyên.')
+        form.addWidget(QLabel('Mẫu đường dẫn'), 5, 0)
+        form.addWidget(self.rtsp_path, 5, 1, 1, 3)
         camera_layout.addWidget(self.editor)
         self.auto = QCheckBox('Tự chạy khi đăng nhập Windows')
         options = QHBoxLayout()
         options.addWidget(self.auto, 1)
-        self.save_config_button = QPushButton('Lưu cấu hình')
-        self.save_config_button.setToolTip('Lưu thông tin camera và tùy chọn tự chạy, chưa kết nối.')
-        self.save_config_button.clicked.connect(self.save)
-        options.addWidget(self.save_config_button)
+        self.remember = QCheckBox('Lưu cấu hình')
+        self.remember.setChecked(True)
+        self.remember.setToolTip('Lưu camera và mật khẩu được Windows mã hóa khi bấm Kết nối và sử dụng. Bỏ chọn: chỉ áp dụng đến khi service khởi động lại; cấu hình đã lưu trước đó vẫn giữ nguyên.')
+        self.remember.toggled.connect(self.remember_changed)
+        self.auto.toggled.connect(lambda checked: self.remember.setChecked(True) if checked else None)
+        options.addWidget(self.remember)
         camera_layout.addLayout(options)
         row = QHBoxLayout()
         self.save_button = QPushButton('Kết nối và sử dụng')
@@ -394,6 +406,25 @@ class ServiceWindow(QMainWindow):
         self.discovery_results = queue.Queue(1)
         self.discovery_timer = QTimer(self)
         self.discovery_timer.timeout.connect(self.finish_scan)
+        self.discovery_cancel = threading.Event()
+        self.discovery_progress = ''
+
+    def remember_changed(self, checked):
+        if not checked:
+            self.auto.setChecked(False)
+            self.notice.setText('Chỉ dùng tạm đến khi service khởi động lại. Cấu hình đã lưu trước đó vẫn được giữ.')
+
+    def expand_address(self):
+        if self.keep_address.isChecked():
+            return
+        try:
+            previous = self.address.text().strip()
+            expanded = expand_rtsp_address(previous, self.rtsp_path.text().strip())
+            self.address.setText(expanded)
+            if expanded != previous:
+                self.notice.setText('Đã tạo URL theo mẫu đường dẫn. Kiểm tra mẫu phù hợp với model camera.')
+        except ValueError:
+            self.notice.setText('Nhập IP hợp lệ (có thể kèm cổng) hoặc URL RTSP đầy đủ; kiểm tra mẫu đường dẫn.')
 
     def receive(self, response):
         command = response.get('_command')
@@ -424,7 +455,7 @@ class ServiceWindow(QMainWindow):
         elif self.use_stage == 'saving' and command == 'configure':
             self.use_stage = 'connecting'
             self.send('connect', camera_id=self.use_camera_id)
-            self.notice.setText('Đã lưu. Đang kết nối camera…')
+            self.notice.setText('Đã lưu. Đang kết nối camera…' if self.remember.isChecked() else 'Đã áp dụng tạm. Đang kết nối camera…')
         elif self.use_stage == 'connecting' and command == 'connect':
             self.use_stage = 'waiting'
         if self.use_stage == 'waiting':
@@ -443,6 +474,7 @@ class ServiceWindow(QMainWindow):
     def capture(self):
         if not self.config:
             return
+        self.expand_address()
         camera = self.config['cameras'][self.index]
         camera.update(name=self.name.text().strip(), username=self.username.text(),
                       address=None if self.keep_address.isChecked() else self.address.text().strip(),
@@ -535,14 +567,70 @@ class ServiceWindow(QMainWindow):
                 self.use_stage = None
 
     def scan_lan(self):
+        if self.discovery_timer.isActive():
+            self.discovery_cancel.set()
+            self.scan_button.setEnabled(False)
+            self.notice.setText('Đang dừng quét…')
+            return
         if self.busy or self.use_stage or not self.config or self.discovery_timer.isActive():
             return
-        self.scan_button.setEnabled(False)
-        self.notice.setText('Đang quét camera ONVIF trong LAN…')
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Quét camera LAN')
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel('Chọn card mạng hoặc quét dải IP camera.'))
+        interfaces = local_interfaces()
+        adapter = QComboBox()
+        adapter.addItem('Tất cả card mạng đang hoạt động', None)
+        for name, address, network in interfaces:
+            adapter.addItem(f'{name} — {address}', (address, network))
+        layout.addWidget(adapter)
+        tcp = QCheckBox('Quét thêm RTSP theo dải IP (kể cả khác VLAN)')
+        layout.addWidget(tcp)
+        subnet = QLineEdit()
+        subnet.setPlaceholderText('Ví dụ: 192.168.100.0/24 — tối đa 1024 địa chỉ')
+        subnet.setEnabled(False)
+        tcp.toggled.connect(subnet.setEnabled)
+        adapter.currentIndexChanged.connect(lambda: subnet.setText(adapter.currentData()[1]) if adapter.currentData() else None)
+        layout.addWidget(subnet)
+        hint = QLabel('Khác VLAN cần được router/firewall cho phép truy cập. RTSP quét cổng 554; tìm thấy thiết bị chưa có nghĩa là đã xác nhận đường dẫn stream.')
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText('Bắt đầu quét')
+        def accept():
+            if tcp.isChecked():
+                try:
+                    scan_network(subnet.text())
+                except ValueError:
+                    hint.setText('Dải IPv4 không hợp lệ hoặc quá lớn. Ví dụ: 192.168.100.0/24 (tối đa 1024 địa chỉ).')
+                    return
+            dialog.accept()
+        buttons.accepted.connect(accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        selected = [adapter.currentData()[0]] if adapter.currentData() else [entry[1] for entry in interfaces]
+        target = subnet.text().strip() if tcp.isChecked() else None
+        self.discovery_cancel.clear()
+        self.discovery_progress = 'Đang quét ONVIF trên card mạng đã chọn…'
+        self.scan_button.setText('Dừng quét LAN')
         def worker():
             try:
-                result = discover_onvif()
-            except OSError:
+                try:
+                    result = discover_onvif(interfaces=selected, cancel=self.discovery_cancel)
+                except OSError:
+                    if not target:
+                        raise
+                    result = []
+                if target and not self.discovery_cancel.is_set():
+                    def progress(done, total):
+                        self.discovery_progress = f'Đang quét RTSP: {done}/{total} địa chỉ…'
+                    devices = {device.host: device for device in result}
+                    for device in scan_rtsp(target, self.discovery_cancel, progress):
+                        devices.setdefault(device.host, device)
+                    result = list(devices.values())
+            except (OSError, ValueError):
                 result = None
             self.discovery_results.put(result)
         threading.Thread(target=worker, daemon=True).start()
@@ -552,30 +640,46 @@ class ServiceWindow(QMainWindow):
         try:
             devices = self.discovery_results.get_nowait()
         except queue.Empty:
+            self.notice.setText(self.discovery_progress)
             return
         self.discovery_timer.stop()
         self.scan_button.setEnabled(True)
+        self.scan_button.setText('Quét camera LAN')
+        if self.discovery_cancel.is_set():
+            self.notice.setText('Đã dừng quét LAN.')
+            return
         if devices is None:
             self.notice.setText('Không quét được LAN. Kiểm tra mạng và quyền Windows Firewall.')
             return
         if not devices:
-            self.notice.setText('Không tìm thấy camera ONVIF. Bạn vẫn có thể thêm URL RTSP thủ công.')
+            self.notice.setText('Không tìm thấy camera. Thử chọn đúng card mạng hoặc quét dải IP bằng RTSP; kiểm tra VLAN/firewall. Bạn vẫn có thể nhập IP thủ công.')
             return
         dialog = QDialog(self)
-        dialog.setWindowTitle('Camera ONVIF trong LAN')
+        dialog.setWindowTitle('Kết quả quét camera')
         dialog.resize(620, 360)
         layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel('Chọn camera cần thêm. Sau đó nhập đường dẫn RTSP, tài khoản và mật khẩu.'))
+        layout.addWidget(QLabel('Chọn camera. URL sẽ được tạo theo mẫu bên dưới; nhập tài khoản sau khi thêm.'))
+        template = QLineEdit(self.rtsp_path.text())
+        layout.addWidget(QLabel('Mẫu đường dẫn (mặc định i-PRO / Panasonic)'))
+        layout.addWidget(template)
         choices = QListWidget()
         choices.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         for device in devices:
             item = QListWidgetItem(f'{device.name} — {device.host}')
             item.setData(Qt.ItemDataRole.UserRole, device)
             choices.addItem(item)
-        choices.selectAll()
         layout.addWidget(choices)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
+        def accept_devices():
+            if not choices.selectedItems():
+                return
+            try:
+                expand_rtsp_address(choices.selectedItems()[0].data(Qt.ItemDataRole.UserRole).host, template.text())
+            except ValueError:
+                template.setFocus()
+                return
+            dialog.accept()
+        buttons.accepted.connect(accept_devices)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
         if dialog.exec() != QDialog.DialogCode.Accepted:
@@ -589,17 +693,18 @@ class ServiceWindow(QMainWindow):
             if len(self.config['cameras']) >= MAX_CAMERAS:
                 break
             device = item.data(Qt.ItemDataRole.UserRole)
-            if device.rtsp_url in addresses:
+            address = expand_rtsp_address(device.host, template.text())
+            if address in addresses:
                 continue
             if empty_first:
-                self.config['cameras'][0].update(name=device.name, address=device.rtsp_url)
-                addresses.add(device.rtsp_url)
+                self.config['cameras'][0].update(name=device.name, address=address)
+                addresses.add(address)
                 added += 1
                 empty_first = False
                 continue
             self.config['cameras'].append({'id': str(uuid4()), 'name': device.name, 'kind': 'rtsp',
-                'address': device.rtsp_url, 'username': '', 'password': ''})
-            addresses.add(device.rtsp_url)
+                'address': address, 'username': '', 'password': ''})
+            addresses.add(address)
             added += 1
         if added:
             self.index = len(self.config['cameras']) - 1
@@ -626,7 +731,7 @@ class ServiceWindow(QMainWindow):
     def save(self):
         if self.config:
             self.capture()
-            self.send('configure', update=self.config)
+            self.send('configure', update=self.config, persist=self.remember.isChecked())
 
     def selected_command(self, command):
         if command == 'disconnect':
@@ -679,7 +784,7 @@ class ServiceWindow(QMainWindow):
         self.output_button.setText('Hủy kết nối' if self.use_stage else 'Dừng phát')
         self.save_button.setText('Đang lưu…' if self.busy else ('Đang kết nối…' if self.use_stage else 'Kết nối và sử dụng'))
         self.save_button.setEnabled(bool(self.config) and not self.busy and not self.use_stage)
-        self.save_config_button.setEnabled(bool(self.config) and not self.busy and not self.use_stage)
+        self.remember.setEnabled(bool(self.config) and not self.busy and not self.use_stage)
         self.auto.setEnabled(not self.busy and not self.use_stage)
         self.editor.setEnabled(not self.busy and not self.use_stage)
         self.cameras.setEnabled(not self.busy and not self.use_stage)

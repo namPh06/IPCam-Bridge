@@ -27,6 +27,7 @@ class CaptureRuntime:
         self.lock = threading.Lock()
         self.snapshot = None
         self.closing = False
+        self.transient = False
 
     def start(self):
         camera_id = str(uuid4())
@@ -67,6 +68,9 @@ class CaptureRuntime:
                 if update.get('revision') != self.config['revision']:
                     return self._response('stale_revision')
                 new = merge_update(self.config, update)
+                persist = request.get('persist', True if command == 'configure' else not self.transient)
+                if not persist and new['auto_connect']:
+                    return self._response('invalid_request')
                 previous = {spec['id']: (spec, camera) for spec, camera in zip(self.config['cameras'], self.group.cameras)}
                 incoming = {spec['id']: spec for spec in new['cameras']}
                 if self.group.active and new['resolution'] != self.config['resolution']:
@@ -81,7 +85,8 @@ class CaptureRuntime:
                 cameras = [previous[spec['id']][1] if spec['id'] in previous else BridgeController(width, height)
                            for spec in new['cameras']]
                 try:
-                    save_service_config(self.path, new)
+                    if persist:
+                        save_service_config(self.path, new)
                 except ValueError:
                     return self._response('save_failed')
                 for camera_id, (_, camera) in previous.items():
@@ -93,6 +98,7 @@ class CaptureRuntime:
                     self.group.set_resolution(width, height)
                 self.group.cameras = cameras
                 self.config = new
+                self.transient = not persist
                 self.group.select(self._index(new['selected_id']))
                 self.generation += 1
                 if new['auto_connect'] and command == 'configure':

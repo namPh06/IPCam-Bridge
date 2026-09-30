@@ -18,6 +18,32 @@ from ip_camera_bridge.sources import SourceSpec, run_source
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_temporary_configuration_never_overwrites_saved_cameras(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'profiles.dat'
+            runtime = CaptureRuntime(path)
+            runtime.start()
+            try:
+                config = copy.deepcopy(runtime.config)
+                self.assertTrue(runtime.handle({'command': 'configure', 'update': config})['ok'])
+                saved = path.read_bytes()
+                config = copy.deepcopy(runtime.config)
+                config['cameras'][0]['password'] = 'temporary@secret'
+                self.assertTrue(runtime.handle({'command': 'configure', 'update': config, 'persist': False})['ok'])
+                self.assertEqual(path.read_bytes(), saved)
+                self.assertTrue(runtime.handle({'command': 'select', 'camera_id': config['selected_id'],
+                                                'revision': runtime.config['revision']})['ok'])
+                self.assertEqual(path.read_bytes(), saved)
+                config = copy.deepcopy(runtime.config)
+                config['auto_connect'] = True
+                self.assertFalse(runtime.handle({'command': 'configure', 'update': config, 'persist': False})['ok'])
+                config['auto_connect'] = False
+                self.assertTrue(runtime.handle({'command': 'configure', 'update': config})['ok'])
+                self.assertNotEqual(path.read_bytes(), saved)
+                self.assertNotIn(b'temporary@secret', path.read_bytes())
+            finally:
+                runtime.close()
+
     def test_service_rtsp_recovers_after_more_than_eight_failures(self):
         stop, statuses, delays = threading.Event(), queue.Queue(100), []
         image = av.VideoFrame.from_ndarray(np.zeros((48, 64, 3), np.uint8), format='rgb24')

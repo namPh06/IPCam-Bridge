@@ -1,5 +1,5 @@
 #define AppName "IP Camera Bridge"
-#define AppVersion "0.3.3"
+#define AppVersion "0.3.4"
 #define OBSInstaller "OBS-Studio-32.2.2-Windows-x64-Installer.exe"
 
 [Setup]
@@ -77,12 +77,12 @@ end;
 
 function CanChooseOBS: Boolean;
 begin
-  Result := IsAdminInstallMode and not IsOBSInstalled;
+  Result := not IsOBSInstalled;
 end;
 
 function ShouldInstallOBS: Boolean;
 begin
-  Result := CanChooseOBS and WizardIsTaskSelected('installobs');
+  Result := IsAdminInstallMode and CanChooseOBS and WizardIsTaskSelected('installobs');
 end;
 
 function InstallDirectory(Param: String): String;
@@ -153,16 +153,19 @@ var
   HadOBSCommonShortcut, HadOBSUserShortcut: Boolean;
 begin
   if (CurStep = ssInstall) and not IsAdminInstallMode then begin
+    InstallFailed := True;
     { Inno permits relaunching Setup only after ssInstall. This outer process
       copies no payload, uses only a temporary directory, and stays alive
       so the elevated helper can authenticate the original user's token. }
-    Params := '/ALLUSERS /NORESTART /OWNERPID=' + IntToStr(GetCurrentProcessId);
-    if WizardSilent then Params := Params + ' /VERYSILENT /SUPPRESSMSGBOXES';
+    WizardForm.StatusLabel.Caption := 'Đang cài ứng dụng và Windows Service. Vui lòng chờ…';
+    Params := '/ALLUSERS /NORESTART /VERYSILENT /SUPPRESSMSGBOXES /SP- /OWNERPID=' + IntToStr(GetCurrentProcessId);
+    Params := Params + ' /TASKS="' + WizardSelectedTasks(False) + '"';
     if not ShellExec('runas', ExpandConstant('{srcexe}'), Params, '',
-                     SW_SHOWNORMAL, ewWaitUntilTerminated, Code) then
+                     SW_HIDE, ewWaitUntilTerminated, Code) then
       RaiseException('Administrator permission was not granted. Nothing was installed.');
     if Code <> 0 then
       RaiseException('The elevated installer did not finish successfully.');
+    InstallFailed := False;
   end;
   if (CurStep = ssPostInstall) and IsAdminInstallMode then begin
     InstallFailed := True;

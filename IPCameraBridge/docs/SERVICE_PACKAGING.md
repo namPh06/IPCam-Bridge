@@ -1,5 +1,13 @@
 # Đóng gói bản Windows Service
 
+## Bản 0.3.4
+
+- Chỉ cửa sổ cài chính hiển thị. Tiến trình quản trị chạy với `/VERYSILENT`; lựa chọn cài OBS được chuyển từ cửa sổ chính. Hộp thoại UAC vẫn hiện khi cần quyền quản trị.
+- Checkbox **Lưu cấu hình** mặc định bật: bấm **Kết nối và sử dụng** sẽ lưu cấu hình bằng DPAPI. Bỏ chọn chỉ áp dụng tạm đến khi service khởi động lại, không xóa cấu hình đã lưu trước đó. Tự chạy Windows yêu cầu bật lưu.
+- Nhập IP hoặc IP:cổng sẽ tạo URL theo **Mẫu đường dẫn**, mặc định i-PRO `/Src/MediaInput/stream_1`. URL RTSP đầy đủ được giữ nguyên. Camera khác có thể cần mẫu khác; đây không phải tự nhận diện model hay bảo đảm đường dẫn đúng.
+- Quét ONVIF trên mọi card mạng đang hoạt động hoặc card được chọn; quét RTSP tùy chọn theo dải IPv4 tối đa 1024 địa chỉ, cổng 554, có tiến độ và nút dừng. Thiết bị phải phản hồi giao thức RTSP mới được đưa vào kết quả. Khác VLAN vẫn cần routing/firewall cho phép; ứng dụng không thay đổi thiết lập mạng.
+- Màu chữ được đặt rõ ràng để giao diện sáng không mất chữ khi Windows dùng palette tối.
+
 Máy build cần Windows x64, Python 3.13 x64 cùng các dependency đã khóa, [Inno Setup 6.7.3 trở lên](https://jrsoftware.org/isdl.php), và bộ cài OBS Studio 32.2.2 x64 chính thức. Máy nhận không cần Python.
 
 ```powershell

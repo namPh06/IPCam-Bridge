@@ -4,8 +4,8 @@
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows11&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.3.3-2E8B57)
-![Tests](https://img.shields.io/badge/tests-78%20passed-brightgreen)
+![Version](https://img.shields.io/badge/version-0.3.4-2E8B57)
+![Tests](https://img.shields.io/badge/tests-83%20passed-brightgreen)
 
 IP Camera Bridge nhận hình ảnh từ RTSP, video hoặc Test Pattern, hiển thị preview và xuất một camera đã chọn qua thiết bị **OBS Virtual Camera**. Ứng dụng hỗ trợ tối đa 16 nguồn, tự kết nối lại khi mất mạng và có thể hoạt động nền cùng Windows.
 
@@ -31,7 +31,7 @@ IP Camera Bridge nhận hình ảnh từ RTSP, video hoặc Test Pattern, hiển
 | Chức năng | Mô tả |
 |---|---|
 | Nguồn RTSP | Nhận H.264/H.265 và các luồng video được FFmpeg/PyAV hỗ trợ qua RTSP TCP. |
-| Quét LAN | Tìm camera hỗ trợ ONVIF WS-Discovery trong cùng mạng LAN. |
+| Quét LAN | ONVIF trên nhiều card mạng; tùy chọn quét RTSP theo dải IP tối đa 1024 địa chỉ. |
 | Nhiều camera | Lưu tối đa 16 nguồn và chọn một camera để xuất tại mỗi thời điểm. |
 | Webcam ảo | Xuất hình qua **OBS Virtual Camera** cho Meet, Zoom và ứng dụng tương thích webcam Windows. |
 | Windows Service | Tự nhận camera khi Windows khởi động và tự bật webcam sau khi người dùng đăng nhập. |
@@ -98,11 +98,13 @@ Gỡ ứng dụng trong **Settings → Apps → Installed apps**. OBS Studio là
 
 ## Thiết lập lần đầu
 
-1. **Thêm camera:** quét LAN hoặc nhập URL RTSP, tên đăng nhập và mật khẩu riêng.
-2. **Kết nối và sử dụng:** tool lưu cấu hình, kết nối camera rồi tự bật webcam ảo khi đã nhận hình.
+1. **Thêm camera:** quét LAN hoặc nhập IP / URL RTSP, tên đăng nhập và mật khẩu riêng.
+2. **Kết nối và sử dụng:** tool lưu cấu hình nếu checkbox **Lưu cấu hình** được bật, kết nối camera rồi tự bật webcam ảo khi đã nhận hình.
 3. **Trong Meet / Zoom:** chọn **OBS Virtual Camera**.
 
 Bật **Tự chạy khi đăng nhập Windows** trước khi bấm **Kết nối và sử dụng** để ghi nhớ lựa chọn. Service nhận camera khi Windows khởi động; bộ phát chạy sau đăng nhập.
+
+**Lưu cấu hình** mặc định bật. Bỏ chọn để dùng tạm đến khi Windows Service khởi động lại; cấu hình đã lưu trước đó không bị xóa hay ghi đè. Bật tự chạy Windows sẽ tự bật lưu cấu hình. Sau khi chỉnh checkbox, bấm **Kết nối và sử dụng** để áp dụng.
 
 Màn hình chính hiển thị trạng thái camera và webcam. **Đầu ra đã chọn** chỉ là lựa chọn nguồn; **Đang phát** chỉ hiện sau khi bộ phát báo hoạt động và nguồn đã kết nối. Bấm **Xem hình camera** khi cần kiểm tra hình, preview mặc định được ẩn.
 
@@ -114,11 +116,11 @@ Không có mạng camera? Dùng **Tác vụ khác → Thêm camera thử (Test P
 
 Nút **Quét camera LAN** nằm trong phần **1. Chọn và cấu hình camera**.
 
-1. Kết nối máy tính vào cùng mạng LAN/VLAN với camera.
-2. Bấm **Quét camera LAN** và chờ khoảng vài giây.
-3. Chọn một hoặc nhiều camera ONVIF trong danh sách.
-4. Bấm **OK** để thêm các camera đã chọn.
-5. Chọn từng camera và hoàn thiện trường **URL RTSP**.
+1. Bấm **Quét camera LAN**, chọn card mạng hoặc giữ **Tất cả card mạng đang hoạt động**.
+2. Nếu cần tìm thiết bị không phản hồi ONVIF hoặc khác VLAN, bật **Quét thêm RTSP theo dải IP** rồi nhập dải, ví dụ `192.168.100.0/24`. Quét tối đa 1024 địa chỉ qua cổng 554; khác VLAN cần routing/firewall cho phép.
+3. Bấm **Bắt đầu quét**, theo dõi tiến độ; có thể bấm **Dừng quét LAN**.
+4. Chọn một hoặc nhiều thiết bị, kiểm tra **Mẫu đường dẫn** rồi bấm **OK**.
+5. URL RTSP được tạo tự động theo mẫu. Mặc định dành cho i-PRO / Panasonic: `/Src/MediaInput/stream_1`; đổi mẫu theo model khác nếu cần.
 6. Nhập tên đăng nhập và mật khẩu.
 7. Bấm **Kết nối và sử dụng**. Nếu cần xem hình, bấm **Xem hình camera**.
 
@@ -140,7 +142,7 @@ Nếu không tìm thấy camera:
 1. Bấm **Thêm**.
 2. Đặt **Tên camera** dễ nhận biết.
 3. RTSP được chọn mặc định, không cần chọn loại nguồn.
-4. Nhập URL không chứa thông tin đăng nhập:
+4. Nhập IP (ví dụ `192.168.100.77`) hoặc `IP:cổng`. Khi rời ô nhập, tool tạo URL theo **Mẫu đường dẫn**. Hoặc nhập URL đầy đủ để giữ nguyên đường dẫn:
 
    ```text
    rtsp://192.168.1.100:554/duong-dan-stream
@@ -161,7 +163,7 @@ Nhập mật khẩu ở dạng nguyên bản. Ví dụ, nếu mật khẩu chứ
 - Vào **Tác vụ khác → Kết nối / ngắt tất cả** để nhận đồng thời các nguồn đã lưu.
 - Chọn camera trong danh sách rồi bấm **Kết nối và sử dụng** để chuyển hình đưa vào webcam ảo.
 - Google Meet/Zoom vẫn sử dụng cùng một thiết bị **OBS Virtual Camera** khi chuyển camera.
-- Các thao tác ngắt nguồn, kết nối/ngắt tất cả, xóa camera và lưu riêng nằm trong **Tác vụ khác**.
+- Các thao tác ngắt nguồn, kết nối/ngắt tất cả và xóa camera nằm trong **Tác vụ khác**.
 
 Ứng dụng xuất một camera tại một thời điểm. Các camera còn lại có thể tiếp tục kết nối để chuyển nguồn nhanh, tùy khả năng CPU và mạng của máy.
 
@@ -194,7 +196,7 @@ Một số ứng dụng chỉ đọc danh sách camera lúc khởi động. Nế
 Tự chạy khi đăng nhập Windows
 ```
 
-Sau đó bấm **Kết nối và sử dụng** hoặc **Tác vụ khác → Lưu cấu hình, chưa kết nối**.
+Sau đó bấm **Kết nối và sử dụng**; checkbox **Lưu cấu hình** sẽ được bật cùng tùy chọn tự chạy.
 
 - Service `IPCameraBridgeCapture` tự chạy từ lúc Windows khởi động.
 - Camera được kết nối nền theo cấu hình đã lưu.

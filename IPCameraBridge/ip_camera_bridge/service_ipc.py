@@ -89,7 +89,12 @@ def validate_request(message):
               'connect': {'camera_id'}, 'disconnect': {'camera_id'}}
     try:
         command = message['command']
-        if set(message) != fields[command] | {'command'}:
+        allowed = fields[command] | {'command'}
+        if command == 'configure' and 'persist' in message:
+            allowed.add('persist')
+            if type(message['persist']) is not bool:
+                raise ValueError
+        if set(message) != allowed:
             raise ValueError
         if command == 'configure' and not isinstance(message['update'], dict):
             raise ValueError
