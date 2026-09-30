@@ -54,6 +54,15 @@ Filename: "{commonpf64}\IPCameraBridge\IPCameraBridge.exe"; Description: "Mở I
 var
   OwnerPID: Integer;
   InstallFailed: Boolean;
+  InstallProgress: TOutputMarqueeProgressWizardPage;
+
+procedure InitializeWizard;
+begin
+  if not IsAdminInstallMode then
+    InstallProgress := CreateOutputMarqueeProgressPage(
+      'Đang cài đặt IP Camera Bridge',
+      'Vui lòng chờ bộ cài hoàn tất.');
+end;
 
 function IsUserSetup: Boolean;
 begin
@@ -160,12 +169,20 @@ begin
     WizardForm.StatusLabel.Caption := 'Đang cài ứng dụng và Windows Service. Vui lòng chờ…';
     Params := '/ALLUSERS /NORESTART /VERYSILENT /SUPPRESSMSGBOXES /SP- /OWNERPID=' + IntToStr(GetCurrentProcessId);
     Params := Params + ' /TASKS="' + WizardSelectedTasks(False) + '"';
-    if not ShellExec('runas', ExpandConstant('{srcexe}'), Params, '',
+    InstallProgress.SetText('Đang cài ứng dụng, Windows Service và thành phần đã chọn...',
+      'Thanh chuyển động cho biết bộ cài đang chờ xử lý, không phải phần trăm hoàn thành.');
+    InstallProgress.Show;
+    InstallProgress.Animate;
+    try
+      if not ShellExec('runas', ExpandConstant('{srcexe}'), Params, '',
                      SW_HIDE, ewWaitUntilTerminated, Code) then
-      RaiseException('Administrator permission was not granted. Nothing was installed.');
-    if Code <> 0 then
-      RaiseException('The elevated installer did not finish successfully.');
-    InstallFailed := False;
+        RaiseException('Administrator permission was not granted. Nothing was installed.');
+      if Code <> 0 then
+        RaiseException('The elevated installer did not finish successfully.');
+      InstallFailed := False;
+    finally
+      InstallProgress.Hide;
+    end;
   end;
   if (CurStep = ssPostInstall) and IsAdminInstallMode then begin
     InstallFailed := True;
