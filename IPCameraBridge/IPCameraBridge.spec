@@ -3,7 +3,7 @@ a = Analysis(
     ['run.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('ip_camera_bridge/assets', 'ip_camera_bridge/assets')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -15,6 +15,7 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, a.binaries, a.datas, [],
     name='IPCameraBridge',
+    icon='ip_camera_bridge/assets/app.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

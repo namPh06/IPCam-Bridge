@@ -1,5 +1,5 @@
 #define AppName "IP Camera Bridge"
-#define AppVersion "0.3.5"
+#define AppVersion "0.3.10"
 #define OBSInstaller "OBS-Studio-32.2.2-Windows-x64-Installer.exe"
 
 [Setup]
@@ -21,10 +21,12 @@ CreateAppDir=yes
 Uninstallable=IsAdminInstallMode
 UninstallDisplayIcon={app}\IPCameraBridge.exe
 OutputDir=dist-service
-OutputBaseFilename=IPCameraBridge-Setup
+OutputBaseFilename=IPCameraBridge-Setup-{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=ip_camera_bridge\assets\app.ico
+WizardSmallImageFile=ip_camera_bridge\assets\wizard-logo.bmp
 CloseApplications=no
 RestartApplications=no
 RestartIfNeededByRun=no
@@ -37,18 +39,18 @@ Source: "third_party\OBS-NOTICE.txt"; DestDir: "{app}"; Flags: ignoreversion; Ch
 Source: "third_party\{#OBSInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: ShouldInstallOBS
 
 [Tasks]
-Name: "installobs"; Description: "Cài OBS Studio 32.2.2 (cung cấp thiết bị OBS Virtual Camera)"; GroupDescription: "Thành phần tùy chọn:"; Check: CanChooseOBS
+Name: "installobs"; Description: "Install OBS Studio 32.2.2 (provides OBS Virtual Camera)"; GroupDescription: "Optional components:"; Check: CanChooseOBS
 
 [Icons]
-Name: "{commonprograms}\{#AppName}"; Filename: "{app}\IPCameraBridge.exe"; Check: IsAdminInstallMode
-Name: "{commondesktop}\{#AppName}"; Filename: "{app}\IPCameraBridge.exe"; Check: IsAdminInstallMode
+Name: "{commonprograms}\{#AppName}"; Filename: "{app}\IPCameraBridge.exe"; IconFilename: "{app}\_internal\ip_camera_bridge\assets\app.ico"; AppUserModelID: "IPCameraBridge.Desktop"; Check: IsAdminInstallMode
+Name: "{commondesktop}\{#AppName}"; Filename: "{app}\IPCameraBridge.exe"; IconFilename: "{app}\_internal\ip_camera_bridge\assets\app.ico"; AppUserModelID: "IPCameraBridge.Desktop"; Check: IsAdminInstallMode
 
 [Messages]
-FinishedHeadingLabel=Đã cài đặt IP Camera Bridge thành công
-FinishedLabel=IP Camera Bridge đã được cài đặt. Bạn có thể mở ứng dụng từ biểu tượng trên Desktop để thêm camera và kết nối.
+FinishedHeadingLabel=IP Camera Bridge installed successfully
+FinishedLabel=IP Camera Bridge has been installed. Open the desktop shortcut to add and connect your cameras.
 
 [Run]
-Filename: "{commonpf64}\IPCameraBridge\IPCameraBridge.exe"; Description: "Mở IP Camera Bridge ngay"; Flags: postinstall nowait skipifsilent; Check: IsUserSetup
+Filename: "{commonpf64}\IPCameraBridge\IPCameraBridge.exe"; Description: "Launch IP Camera Bridge now"; Flags: postinstall nowait skipifsilent; Check: IsUserSetup
 
 [Code]
 var
@@ -60,8 +62,8 @@ procedure InitializeWizard;
 begin
   if not IsAdminInstallMode then
     InstallProgress := CreateOutputMarqueeProgressPage(
-      'Đang cài đặt IP Camera Bridge',
-      'Vui lòng chờ bộ cài hoàn tất.');
+      'Installing IP Camera Bridge',
+      'Please wait while Setup completes the installation.');
 end;
 
 function IsUserSetup: Boolean;
@@ -166,11 +168,11 @@ begin
     { Inno permits relaunching Setup only after ssInstall. This outer process
       copies no payload, uses only a temporary directory, and stays alive
       so the elevated helper can authenticate the original user's token. }
-    WizardForm.StatusLabel.Caption := 'Đang cài ứng dụng và Windows Service. Vui lòng chờ…';
+    WizardForm.StatusLabel.Caption := 'Installing the application and Windows Service. Please wait...';
     Params := '/ALLUSERS /NORESTART /VERYSILENT /SUPPRESSMSGBOXES /SP- /OWNERPID=' + IntToStr(GetCurrentProcessId);
     Params := Params + ' /TASKS="' + WizardSelectedTasks(False) + '"';
-    InstallProgress.SetText('Đang cài ứng dụng, Windows Service và thành phần đã chọn...',
-      'Thanh chuyển động cho biết bộ cài đang chờ xử lý, không phải phần trăm hoàn thành.');
+    InstallProgress.SetText('Installing the application, Windows Service and selected components...',
+      '');
     InstallProgress.Show;
     InstallProgress.Animate;
     try

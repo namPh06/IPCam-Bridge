@@ -6,7 +6,7 @@ a = Analysis(
     ['run.py'],
     pathex=[],
     binaries=[(pythoncom.__file__, '.'), (pywintypes.__file__, '.')],
-    datas=[],
+    datas=[('ip_camera_bridge/assets', 'ip_camera_bridge/assets')],
     hiddenimports=[
         'servicemanager', 'win32serviceutil', 'win32service', 'win32timezone',
         'win32api', 'win32con', 'win32event', 'win32file', 'win32job',
@@ -24,6 +24,7 @@ exe = EXE(
     pyz, a.scripts, [],
     exclude_binaries=True,
     name='IPCameraBridge',
+    icon='ip_camera_bridge/assets/app.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

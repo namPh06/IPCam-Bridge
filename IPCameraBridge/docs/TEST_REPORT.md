@@ -1,5 +1,49 @@
 # Báo cáo kiểm thử IP Camera Bridge
 
+## Biểu tượng Windows — 02/10/2026 (0.3.10)
+
+- 90/90 unittest đạt trong 12,939 giây. Test gọi API Windows thật và đọc lại AppUserModelID, xác nhận trùng định danh trong hai shortcut của bộ cài.
+- App đặt định danh trước cả hai luồng giao diện; service/install/check-service vẫn trả về trước bước này. Shortcut chỉ rõ file ICO thay vì phụ thuộc biểu tượng EXE đã lưu đệm.
+- Tài nguyên icon trong EXE 0.3.10 được trích xuất và so sánh đủ sáu kích thước, khớp byte với `app.ico`. Icon trong bộ cài 0.3.9 cũng khớp; biểu tượng cũ trong ảnh Explorer có thể là bộ nhớ đệm đường dẫn đã dùng lại.
+- Build xuất tên bộ cài có phiên bản để dùng đường dẫn mới; vẫn giữ bản sao tên cũ cho tương thích.
+- Build PyInstaller/Inno thành công: `IPCameraBridge-Setup-0.3.10.exe`, 248.881.012 byte, SHA256 `DCA49ECA5E2D9703E9E6D1EC35F573399DF687115AE3F57616DC935AE5557E28`.
+- Smoke EXE 0.3.10: hai Test Pattern kết nối, RGB 1280×720, 25,26 fps, Qt phản hồi, exit 0. Chưa cài lại hoặc xác nhận bằng mắt taskbar/pinned shortcut của máy đang chạy; cần thoát bộ xuất cũ và mở app mới.
+
+## Giao diện và bộ cài — 02/10/2026 (0.3.9)
+
+- 89/89 unittest đạt trong 11,789 giây. Test kiểm tra dialog quét chỉ có IP nhập thủ công, từ chối dải đảo ngược và truyền đúng giới hạn tới worker.
+- Test xác nhận mật khẩu đã lưu hiển thị dấu chấm mà giá trị nhập vẫn rỗng; cấu hình gửi giữ `password=None`, không gửi dấu chấm hoặc trường `has_password`. Xóa mật khẩu bỏ dấu chấm. Địa chỉ đã che vẫn được giữ và cho phép thay mới.
+- Đã bỏ Tùy chọn nâng cao; toàn bộ chữ tùy chỉnh trong bộ cài chuyển sang tiếng Anh. Logo người dùng cung cấp được chuyển thành icon nhiều kích thước, nhúng trong ứng dụng và bộ cài.
+- Đã render và kiểm tra giao diện Qt với font Segoe UI. Smoke test EXE: hai Test Pattern kết nối, ảnh RGB 1280×720, 24,17 fps, Qt phản hồi, exit 0.
+- Build PyInstaller/Inno thành công; đã xác nhận icon trong tài nguyên EXE/app và bộ cài, cùng asset logo trong payload. SHA256 bộ cài: `E25FF1FA9259514F81429E58C6060798F0B76046A6DCFCA6D46185062A447C51`.
+- Chưa chạy cài đặt trên máy khác hoặc xác nhận camera thật/Meet/Zoom sau khởi động Windows ở bản này. Smoke test không bật webcam ảo.
+
+## Camera chưa nhập URL — 02/10/2026 (0.3.8)
+
+- 89/89 unittest đạt, 11,778 giây. Test mới xác nhận camera RTSP trống không chặn cấu hình/kết nối camera khác; chọn camera trống vẫn bị từ chối trước khi đổi đầu ra.
+- Test runtime xác nhận lưu và tải lại mục trống, bỏ qua khi tự kết nối/kết nối tất cả, không tạo decoder hoặc giữ wanted/retry cho mục trống. URL sai không trống vẫn bị service từ chối.
+- Lần build đầu bị chặn do test publisher dùng khóa webcam đang được app thật sử dụng. Test đã dùng tên khóa riêng; khóa publisher mặc định trong sản phẩm giữ nguyên.
+- Build PyInstaller/Inno thành công. Bộ cài 248.551.892 byte; SHA256 `31134564576E53FB1B07063A99B782187F745422A960DEA38E4815AB84BB2CC8`.
+- Smoke EXE hai Test Pattern connected, RGB 1280×720, 25,28 fps, Qt phản hồi, thoát mã 0. Không bật webcam hoặc thay đổi service đang cài.
+- Chưa cài lại 0.3.8 hoặc nghiệm thu RTSP/Meet/Zoom/khởi động Windows trên máy đích; cần cập nhật bộ cài để service dùng bản sửa.
+
+## Thông báo và danh sách camera — 02/10/2026 (0.3.7)
+
+- 87/87 unittest đạt, 9,508 giây. Test xác nhận danh sách không có checkbox, chọn dòng độc lập camera đầu ra, nút kết nối đổi nguồn và nút dừng kết thúc phát; thông báo lỗi đỏ/thành công xanh.
+- Đã xem ảnh Qt offscreen: camera đang phát xanh, camera lỗi đỏ, dòng được chọn giữ màu chữ đọc được. Thông báo hiện tại nằm trong thẻ đầu ra; bỏ lịch sử và footer cũ.
+- Build service/Inno Setup mã 0. Bộ cài 248.559.046 byte, SHA256 `428E50E118ADCB9F9E560C28B56CCDF4FFB3D2E0DD750144C9D525F336E2C3F7`.
+- Smoke EXE hai Test Pattern connected, RGB 1280×720, 25,71 fps, Qt phản hồi, thoát mã 0. Không bật webcam hoặc thay đổi service đang cài.
+- Chưa cài bản 0.3.7 trên máy đích hoặc nghiệm thu RTSP thật/Meet/Zoom/khởi động Windows; xem checklist thủ công.
+
+## Dashboard — 02/10/2026 (0.3.6)
+
+- **87/87 unittest đạt**, 11,750 giây; build service và Inno Setup hoàn tất mã 0.
+- Test hồi quy xác nhận tìm kiếm, hiện/ẩn mật khẩu, chọn dòng độc lập nguồn phát, kiểm tra RTSP giữ camera đầu ra, và lỗi camera đang sửa không làm sai trạng thái camera đang phát. Sửa địa chỉ mới bỏ lựa chọn giữ URL bí mật cũ.
+- Đã xem ảnh Qt offscreen ở 1240×830 và 960×640: bố cục sidebar, form hai cột, thẻ lỗi và trạng thái đầu ra; nội dung dài cuộn được. Đây không thay thế kiểm tra DPI/Windows theme trên máy đích.
+- Smoke EXE đóng gói: hai Test Pattern connected, RGB 1280×720, 23,97 fps, Qt phản hồi, thoát mã 0. Smoke không bật OBS, không cài lại hoặc thay đổi service đang cài.
+- Bộ cài `dist-service/IPCameraBridge-Setup.exe`: 248.558.176 byte. SHA256: `C04B1D7FE1C23B8D442D2312603FA66559874E1BFA9CBCACAEDE095AFE6ED149`.
+- Chưa nghiệm thu RTSP mạng công ty, Meet/Zoom, khởi động Windows hoặc cài bộ cài 0.3.6 trên máy đích; xem checklist thủ công.
+
 ## Giao diện và quét LAN có giới hạn — 01/10/2026 (0.3.5)
 
 - **86/86 unittest đạt**, 9,601 giây; `pip check` không phát hiện dependency xung đột.

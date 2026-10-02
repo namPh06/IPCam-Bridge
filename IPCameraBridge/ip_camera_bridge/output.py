@@ -15,7 +15,7 @@ class _OutputError(RuntimeError):
 
 
 @contextmanager
-def _publisher_mutex():
+def _publisher_mutex(name='Local\\IPCameraBridgePublisher'):
     if os.name != 'nt':
         raise _OutputError('Webcam ảo OBS của ứng dụng này chỉ hỗ trợ Windows 10/11.')
     kernel = ctypes.WinDLL('kernel32', use_last_error=True)
@@ -23,7 +23,7 @@ def _publisher_mutex():
     kernel.CreateMutexW.restype = wintypes.HANDLE
     kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
     kernel.CloseHandle.restype = wintypes.BOOL
-    handle = kernel.CreateMutexW(None, False, 'Local\\IPCameraBridgePublisher')
+    handle = kernel.CreateMutexW(None, False, name)
     if not handle:
         raise _OutputError('Không tạo được khóa webcam ảo. Hãy đóng ứng dụng khác và thử lại.')
     already_exists = ctypes.get_last_error() == 183  # ERROR_ALREADY_EXISTS

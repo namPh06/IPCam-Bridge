@@ -44,6 +44,39 @@ class RuntimeTests(unittest.TestCase):
             finally:
                 runtime.close()
 
+    def test_empty_camera_is_saved_but_skipped_for_auto_and_manual_connect_all(self):
+        with tempfile.TemporaryDirectory() as directory, patch('ip_camera_bridge.controller.BridgeController.connect') as connect:
+            path = Path(directory) / 'profiles.dat'
+            runtime = CaptureRuntime(path)
+            runtime.start()
+            restored = None
+            try:
+                config = copy.deepcopy(runtime.config)
+                config['cameras'][0].update(kind='rtsp', address='rtsp://camera.example/live')
+                draft = dict(config['cameras'][0], id=str(uuid4()), name='Draft', address='')
+                config['cameras'].append(draft)
+                config['auto_connect'] = True
+                result = runtime.handle({'command': 'configure', 'update': config})
+                self.assertTrue(result['ok'])
+                self.assertEqual(connect.call_count, 1)
+                self.assertNotIn(draft['id'], runtime.wanted)
+                self.assertFalse(result['data']['cameras'][1]['wanted'])
+                self.assertIn('Chưa nhập', result['data']['cameras'][1]['message'])
+                runtime.handle({'command': 'connect', 'camera_id': None})
+                self.assertNotIn(draft['id'], runtime.wanted)
+                restored = CaptureRuntime(path)
+                restored.start()
+                self.assertEqual(restored.config['cameras'][1]['address'], '')
+                self.assertNotIn(draft['id'], restored.wanted)
+                self.assertIn(config['selected_id'], restored.wanted)
+                invalid = copy.deepcopy(restored.config)
+                invalid['cameras'][1]['address'] = 'not-a-url'
+                self.assertFalse(restored.handle({'command': 'configure', 'update': invalid})['ok'])
+            finally:
+                runtime.close()
+                if restored is not None:
+                    restored.close()
+
     def test_service_rtsp_recovers_after_more_than_eight_failures(self):
         stop, statuses, delays = threading.Event(), queue.Queue(100), []
         image = av.VideoFrame.from_ndarray(np.zeros((48, 64, 3), np.uint8), format='rgb24')

@@ -46,7 +46,7 @@ def validate_service_config(data):
                     raise ValueError
             if not camera['name'].strip():
                 raise ValueError
-            if camera['kind'] == 'rtsp':
+            if camera['kind'] == 'rtsp' and camera['address']:
                 validate_rtsp_url(camera['address'])
                 if urlsplit(camera['address']).username is not None:
                     raise ValueError

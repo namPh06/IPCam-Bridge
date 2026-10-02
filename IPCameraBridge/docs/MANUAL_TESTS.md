@@ -1,5 +1,45 @@
 # Checklist nghiệm thu thủ công
 
+## Biểu tượng Windows — 0.3.10
+
+- Mở file bộ cài có phiên bản mới trong Explorer; logo phải đúng ở các chế độ biểu tượng nhỏ và lớn.
+- Sau khi cài, shortcut Desktop/Start Menu và app đang chạy có cùng logo. Nếu đã ghim shortcut cũ, bỏ ghim và ghim lại.
+- Kiểm tra cả chạy từ `run.ps1` và EXE; taskbar không dùng biểu tượng Python. Thoát bộ xuất cũ qua khay hệ thống trước khi chạy lại.
+- Kiểm tra bật webcam tự động sau đăng nhập; thay đổi định danh không được tạo thêm bộ xuất.
+
+## Giao diện và bộ cài — 0.3.9
+
+- Quét LAN chỉ có IP bắt đầu và IP kết thúc; dải đảo ngược hoặc vượt 1024 địa chỉ không được bắt đầu quét.
+- Camera có mật khẩu đã lưu hiển thị dấu chấm. Chuyển camera, kiểm tra RTSP hoặc kết nối khi không nhập mật khẩu mới phải giữ mật khẩu cũ. Nhập mới thay mật khẩu; tác vụ xóa mật khẩu bỏ dấu chấm.
+- Không còn mục Tùy chọn nâng cao. Địa chỉ đã được che vẫn được giữ khi không nhập địa chỉ mới.
+- Bộ cài dùng tiếng Anh; logo mới hiển thị trên EXE, cửa sổ ứng dụng, khay hệ thống và bộ cài.
+
+## Camera chưa cấu hình — 0.3.8
+
+- [ ] Camera 1 có URL hợp lệ, Camera 2 trống: Kết nối Camera 1 lưu được cấu hình và phát webcam.
+- [ ] Kiểm tra RTSP Camera 1 không bị chặn bởi Camera 2 trống; Camera 2 vẫn có trong danh sách.
+- [ ] Chọn Camera 2 trống rồi kết nối: báo nhập URL cho Camera 2, không đổi nguồn đang phát.
+- [ ] Bật tự chạy và khởi động lại Windows: Camera 1 kết nối, Camera 2 trống không bị thử lại liên tục.
+- [ ] Camera khác có URL sai nhưng không trống: báo đúng tên và mở cấu hình camera đó để sửa.
+
+## Thông báo hiện tại — 0.3.7
+
+- [ ] Danh sách camera không có checkbox; biểu tượng và chữ xanh khi đang phát, đỏ khi lỗi, kể cả dòng được chọn.
+- [ ] Chọn dòng không tự đổi nguồn; bấm Kết nối camera để phát nguồn mới.
+- [ ] Khung thông báo chỉ hiện thông báo hiện tại; lỗi đỏ, thành công xanh; không có nút lịch sử hoặc hai dòng footer cũ.
+- [ ] Quét LAN bỏ đoạn chú thích dài nhưng vẫn kiểm tra dải IPv4 tối đa 1024 địa chỉ.
+- [ ] Bộ cài vẫn có thanh tiến trình và bỏ dòng giải thích thanh chuyển động.
+
+## Dashboard — 0.3.6
+
+- [ ] Kiểm tra cửa sổ 1240×830 và 960×640, DPI 100%/150%, Windows Light/Dark; các trường và nút đọc được, vùng nội dung cuộn được.
+- [ ] Tìm camera theo tên/IP; chọn dòng chỉ mở cấu hình, checkbox chuyển nguồn phát.
+- [ ] Khi camera A đang phát, chọn camera B lỗi: lỗi B nằm trong cấu hình, trạng thái đầu ra vẫn ghi A đang phát.
+- [ ] Kiểm tra RTSP của B không đổi camera đầu ra; Kết nối camera chọn B để phát sau khi kết nối thành công.
+- [ ] Hiện/ẩn mật khẩu vừa nhập hoạt động; chuyển camera che lại mật khẩu. Mật khẩu đã lưu không hiện lại.
+- [ ] Lỗi có hướng khắc phục, Thử lại ngay và Xem chi tiết; lịch sử sự cố nằm trong trạng thái đầu ra.
+- [ ] Kiểm tra RTSP thật, webcam Meet/Zoom và tự chạy sau khởi động Windows trên máy đích.
+
 ## Giao diện và quét có giới hạn — 0.3.5
 
 - [ ] Màn hình sáng và các hộp thoại đọc được khi Windows dùng Light/Dark, DPI 100%/150%, cửa sổ tối thiểu 800×600; bàn phím Tab/Space chọn được checkbox.

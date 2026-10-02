@@ -129,6 +129,11 @@ class CaptureRuntime:
         if not self.closing:
             for spec, camera in zip(self.config['cameras'], self.group.cameras):
                 camera_id = spec['id']
+                if spec['kind'] == 'rtsp' and not spec['address']:
+                    self.wanted.discard(camera_id)
+                    self.retry.pop(camera_id, None)
+                    camera.source_state, camera.source_message = 'stopped', 'Chưa nhập URL RTSP. Nhập IP hoặc URL trước khi kết nối.'
+                    continue
                 if camera_id not in self.wanted:
                     continue
                 if camera.source_state == 'connected':

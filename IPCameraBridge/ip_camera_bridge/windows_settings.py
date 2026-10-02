@@ -12,6 +12,15 @@ from .config import atomic_write
 RUN_KEY = r'Software\Microsoft\Windows\CurrentVersion\Run'
 RUN_NAME = 'IPCameraBridge'
 MAX_CAMERAS = 16
+APP_ID = 'IPCameraBridge.Desktop'
+
+
+def set_app_id():
+    """Give source and packaged UI the same Windows taskbar identity."""
+    operation = ctypes.WinDLL('shell32').SetCurrentProcessExplicitAppUserModelID
+    operation.argtypes = [wintypes.LPCWSTR]
+    operation.restype = wintypes.LONG
+    return operation(APP_ID)
 
 
 class _Blob(ctypes.Structure):

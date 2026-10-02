@@ -2,11 +2,31 @@ import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch, MagicMock
+import ctypes
+from ctypes import wintypes
 
 from ip_camera_bridge import windows_settings as settings
 
 
 class WindowsSettingsTests(unittest.TestCase):
+    def test_taskbar_identity_matches_installer_shortcuts(self):
+        self.assertEqual(settings.set_app_id(), 0)
+        shell = ctypes.WinDLL('shell32')
+        operation = shell.GetCurrentProcessExplicitAppUserModelID
+        operation.argtypes = [ctypes.POINTER(wintypes.LPWSTR)]
+        operation.restype = wintypes.LONG
+        app_id = wintypes.LPWSTR()
+        self.assertEqual(operation(ctypes.byref(app_id)), 0)
+        try:
+            self.assertEqual(app_id.value, settings.APP_ID)
+        finally:
+            free = ctypes.WinDLL('ole32').CoTaskMemFree
+            free.argtypes = [ctypes.c_void_p]
+            free.restype = None
+            free(ctypes.cast(app_id, ctypes.c_void_p))
+        installer = (Path(settings.__file__).resolve().parents[1] / 'installer.iss').read_text(encoding='utf-8')
+        self.assertEqual(installer.count(f'AppUserModelID: "{settings.APP_ID}"'), 2)
+
     def test_real_dpapi_roundtrip_and_atomic_failure_preserve_secrets(self):
         profile = {'version': 1, 'selected': 0, 'auto_connect': True, 'cameras': [
             {'name': 'Test camera', 'kind': 'rtsp', 'address': 'rtsp://camera.example/live',

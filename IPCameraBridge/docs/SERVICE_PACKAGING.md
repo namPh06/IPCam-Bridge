@@ -1,5 +1,37 @@
 # Đóng gói bản Windows Service
 
+## Bản 0.3.10
+
+- App đặt định danh taskbar `IPCameraBridge.Desktop` trước khi tạo giao diện, dùng chung với shortcut Start Menu/Desktop. Shortcut trỏ trực tiếp tới icon đã đóng gói.
+- Bộ cài phát hành là `dist-service/IPCameraBridge-Setup-0.3.10.exe`; tên có phiên bản giúp tránh dùng lại biểu tượng Explorer đã lưu cho file cũ. Build vẫn tạo bản sao tên `IPCameraBridge-Setup.exe` để giữ các đường dẫn tải hiện có.
+- Sau khi cài lại, thoát bộ xuất đang chạy qua menu khay hệ thống và mở app mới. Nếu đã ghim shortcut cũ trên taskbar, bỏ ghim và ghim lại shortcut mới.
+
+## Bản 0.3.9
+
+- Bộ cài dùng tiếng Anh, giữ một cửa sổ tiến trình và tùy chọn OBS hiện có.
+- Logo nằm tại `ip_camera_bridge/assets/app.ico`, được nhúng vào EXE, cửa sổ ứng dụng, khay hệ thống và bộ cài; `wizard-logo.bmp` hiển thị trong wizard.
+- Quét LAN chỉ dùng dải IP nhập thủ công. Mật khẩu đã lưu hiện dấu chấm và không được đọc lại về giao diện.
+- Chạy `build.ps1 -Service` để tạo `dist-service/IPCameraBridge-Setup.exe` và file SHA256 bên cạnh.
+
+## Bản 0.3.8
+
+- Camera RTSP chưa nhập URL được lưu như mục chưa hoàn thiện, không chặn kết nối/phát camera đã cấu hình.
+- Service bỏ qua camera trống ở cùng đường xử lý kết nối thủ công và tự kết nối sau khởi động; không tạo decoder hoặc lặp retry cho camera trống.
+- Camera đang chọn để phát phải có URL hợp lệ; URL sai báo đúng camera và mở cấu hình của camera đó. URL không trống vẫn được kiểm tra ở ranh giới service.
+
+## Bản 0.3.7
+
+- Danh sách camera dùng biểu tượng và trạng thái màu; chọn dòng rồi bấm Kết nối camera để phát.
+- Khung thông báo hiện tại thay lịch sử và footer: đỏ khi lỗi, xanh khi thành công, trung tính khi đang xử lý. Log kỹ thuật vẫn được giữ trong file.
+- Bỏ chú thích thanh tiến trình cài đặt và đoạn hướng dẫn dài trong dialog quét LAN; không đổi giới hạn quét hoặc tiến trình cài đặt.
+
+## Bản 0.3.6
+
+- Dashboard mới: danh sách camera và tìm kiếm bên trái; cấu hình hai cột, lỗi và hướng khắc phục bên phải; trạng thái đầu ra nằm riêng phía dưới.
+- Chọn dòng để sửa; checkbox chọn nguồn phát. Kiểm tra RTSP kết nối camera đang sửa mà không đổi camera đầu ra. Tùy chọn lưu vẫn áp dụng cho cấu hình kiểm tra.
+- Nút hiện/ẩn chỉ hiển thị mật khẩu vừa nhập; mật khẩu đã lưu không được trả về giao diện. Tùy chọn nâng cao và tác vụ phụ được thu gọn.
+- Dùng widget Qt và QtSvg có sẵn; không thêm dependency. Kích thước tối thiểu 960×640, vùng nội dung cuộn khi thiếu chiều cao.
+
 ## Bản 0.3.5
 
 - Quét LAN bằng hai giới hạn IPv4 bắt đầu/kết thúc, bao gồm hai đầu và tối đa 1024 địa chỉ. Chỉ kiểm tra RTSP cổng 554 trong dải nhập; không gửi ONVIF multicast. Chọn card mạng chỉ gợi ý dải, Windows vẫn định tuyến kết nối TCP.

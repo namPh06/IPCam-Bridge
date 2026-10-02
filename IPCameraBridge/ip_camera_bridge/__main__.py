@@ -47,6 +47,8 @@ def main():
         except Exception:
             # Installer reports a fixed error; no raw exception/credentials in UI or logs.
             return 1
+    from .windows_settings import set_app_id
+    set_app_id()  # Before either UI path creates windows or a tray icon.
     if not args.smoke_test:
         from .windows_service import owner_policy, service_installed
         policy = owner_policy()
@@ -61,7 +63,7 @@ def main():
     if args.smoke_test:
         os.environ["QT_QPA_PLATFORM"] = "offscreen"
     from PySide6.QtCore import QTimer
-    from PySide6.QtGui import QFont, QFontDatabase
+    from PySide6.QtGui import QFont, QFontDatabase, QIcon
     from PySide6.QtWidgets import QApplication, QMessageBox
     from .config import setup_logging
     from .ui import MainWindow, data_directory
@@ -71,6 +73,7 @@ def main():
         # Qt offscreen does not enumerate Windows system fonts.
         QFontDatabase.addApplicationFont(str(Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts/segoeui.ttf"))
         app.setFont(QFont("Segoe UI", 10))
+    app.setWindowIcon(QIcon(str(Path(__file__).parent / "assets" / "app.ico")))
     app.setApplicationName("IP Camera Bridge")
     app.setOrganizationName("IPCameraBridge")
     destination = Path(args.smoke_test).resolve() if args.smoke_test else data_directory()

@@ -64,10 +64,17 @@ if (-not $ISCCPath -or -not (Test-Path -LiteralPath $ISCCPath)) {
 }
 & $ISCCPath 'installer.iss'
 if ($LASTEXITCODE -ne 0) { throw 'Biên dịch bộ cài service thất bại.' }
-$setup = Join-Path $PSScriptRoot 'dist-service\IPCameraBridge-Setup.exe'
+$setupVersion = [regex]::Match((Get-Content -LiteralPath 'installer.iss' -Raw), '#define AppVersion "([^"]+)"').Groups[1].Value
+if (-not $setupVersion) { throw 'Không đọc được phiên bản bộ cài.' }
+$setupName = "IPCameraBridge-Setup-$setupVersion.exe"
+$setup = Join-Path $PSScriptRoot "dist-service\$setupName"
 $hash = (Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash
-Set-Content -LiteralPath ($setup + '.sha256') -Value "$hash  IPCameraBridge-Setup.exe" -Encoding ASCII
-Write-Host 'Bộ cài một file: dist-service\IPCameraBridge-Setup.exe'
+Set-Content -LiteralPath ($setup + '.sha256') -Value "$hash  $setupName" -Encoding ASCII
+# Preserve existing download paths; use the versioned name for fresh Explorer icons.
+$compatSetup = Join-Path $PSScriptRoot 'dist-service\IPCameraBridge-Setup.exe'
+Copy-Item -LiteralPath $setup -Destination $compatSetup -Force
+Set-Content -LiteralPath ($compatSetup + '.sha256') -Value "$hash  IPCameraBridge-Setup.exe" -Encoding ASCII
+Write-Host "Bộ cài một file: dist-service\$setupName"
 Write-Host "Kèm tùy chọn cài OBS Studio 32.2.2: $obsName"
 Write-Host "SHA256: $hash"
 

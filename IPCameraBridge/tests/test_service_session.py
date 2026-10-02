@@ -11,7 +11,7 @@ from uuid import uuid4
 from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
-from PySide6.QtWidgets import QApplication, QLineEdit, QDialogButtonBox
+from PySide6.QtWidgets import QComboBox, QApplication, QLineEdit, QDialogButtonBox
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtTest import QTest
 from ip_camera_bridge.frames import SharedFrame, status_frame
@@ -57,7 +57,7 @@ class SessionTests(unittest.TestCase):
             abandoned._lock.release()
             session.close()
 
-    def test_checking_another_camera_switches_output_without_multiple_checks(self):
+    def test_connecting_selected_camera_switches_output_without_checkboxes(self):
         session = ServiceSession('test-owner', start_worker=False)
         ids = [str(uuid4()), str(uuid4())]
         response = {'ok': True, '_command': 'status', 'revision': 1, 'generation': 0, 'data': {
@@ -73,13 +73,12 @@ class SessionTests(unittest.TestCase):
             window.refresh()
             window.cameras.setCurrentRow(1)
             self.assertTrue(session.commands.empty())
-            self.assertEqual(window.cameras.item(0).checkState(), Qt.CheckState.Checked)
-            QTest.keyClick(window.cameras, Qt.Key.Key_Space)
+            self.assertFalse(window.cameras.item(0).flags() & Qt.ItemFlag.ItemIsUserCheckable)
+            window.use_camera()
             command = session.commands.get_nowait()
             self.assertEqual(command['command'], 'configure')
             self.assertEqual(command['update']['selected_id'], ids[1])
-            self.assertEqual([window.cameras.item(i).checkState() for i in range(2)],
-                             [Qt.CheckState.Unchecked, Qt.CheckState.Checked])
+            self.assertFalse(window.cameras.item(1).icon().isNull())
             response['_command'] = 'configure'
             response['data']['config']['selected_id'] = ids[1]
             window.receive(response)
@@ -92,7 +91,102 @@ class SessionTests(unittest.TestCase):
             session.tick()
             self.assertIsNone(session.status)
             self.assertNotIn('Đang phát', window.cameras.item(1).text())
-            self.assertIn('Services', window.problems.toPlainText())
+            self.assertIn('Services', window.notice.text())
+        finally:
+            session.close()
+
+    def test_empty_other_camera_does_not_block_selected_camera(self):
+        session = ServiceSession('test-owner', start_worker=False)
+        session.timer.stop()
+        ids = [str(uuid4()), str(uuid4())]
+        response = {'ok': True, '_command': 'status', 'revision': 1, 'generation': 0, 'data': {
+            'pid': os.getpid(), 'config': {'revision': 1, 'resolution': '720p', 'auto_connect': False,
+                'selected_id': ids[0], 'cameras': [dict(id=id, name=f'Camera {i+1}', kind='rtsp',
+                    address='rtsp://camera.example/live' if i == 0 else '', username='', has_password=False)
+                    for i, id in enumerate(ids)]},
+            'cameras': [dict(id=id, state='stopped', message='Chưa kết nối', fps=0, wanted=False) for id in ids]}}
+        try:
+            session.status = response
+            session.open_window()
+            window = session.window
+            window.use_camera()
+            request = session.commands.get_nowait()
+            self.assertEqual(request['command'], 'configure')
+            self.assertEqual(request['update']['selected_id'], ids[0])
+            self.assertEqual(request['update']['cameras'][1]['address'], '')
+            window.busy = False
+            window.use_stage = None
+            window.cameras.setCurrentRow(1)
+            window.use_camera()
+            self.assertTrue(session.commands.empty())
+            self.assertIn('Camera 2', window.notice.text())
+            self.assertIn('URL RTSP', window.notice.text())
+            self.assertEqual(window.config['selected_id'], ids[0])
+        finally:
+            session.close()
+
+    def test_dashboard_search_password_and_rtsp_check_preserve_output(self):
+        session = ServiceSession('test-owner', start_worker=False)
+        session.timer.stop()
+        ids = [str(uuid4()), str(uuid4())]
+        response = {'ok': True, '_command': 'status', 'revision': 1, 'generation': 0, 'data': {
+            'pid': os.getpid(), 'config': {'revision': 1, 'resolution': '720p', 'auto_connect': False,
+                'selected_id': ids[0], 'cameras': [dict(id=id, name=name, kind='test', address='',
+                    username='', has_password=True) for id, name in zip(ids, ['Meeting room', 'Lobby'])]},
+            'cameras': [dict(id=id, state='connected', message='Đã kết nối', fps=15, wanted=True) for id in ids]}}
+        try:
+            session.status = response
+            session.want_output = session.output_running = True
+            session.open_window()
+            window = session.window
+            window.refresh()
+            self.assertIn('đang chạy', window.service_badge.text())
+            window.search.setText('lobby')
+            self.assertTrue(window.cameras.item(0).isHidden())
+            self.assertFalse(window.cameras.item(1).isHidden())
+            window.search.clear()
+            window.cameras.setCurrentRow(1)
+            self.assertEqual(window.camera_title.text(), 'Lobby')
+            self.assertEqual(window.password.placeholderText(), '••••••••')
+            self.assertEqual(window.password.text(), '')
+            window.capture()
+            self.assertIsNone(window.config['cameras'][1]['password'])
+            self.assertNotIn('has_password', window.config['cameras'][1])
+            self.assertFalse(window.windowIcon().isNull())
+            window.password.setText('example@password')
+            window.show_password.trigger()
+            self.assertEqual(window.password.echoMode(), QLineEdit.EchoMode.Normal)
+            window.password.clear()
+            window.config['cameras'][1]['password'] = None
+            window.use_camera(preview_only=True)
+            command = session.commands.get_nowait()
+            self.assertEqual(command['command'], 'configure')
+            self.assertEqual(command['update']['selected_id'], ids[0])
+            response['_command'] = 'configure'
+            window.receive(response)
+            self.assertEqual(session.commands.get_nowait()['camera_id'], ids[1])
+            response['_command'] = 'connect'
+            window.receive(response)
+            self.assertIsNone(window.use_stage)
+            self.assertTrue(session.want_output)
+            self.assertIn('Kiểm tra RTSP thành công', window.notice.text())
+            self.assertEqual(window.password.echoMode(), QLineEdit.EchoMode.Password)
+            window.clear_password()
+            self.assertEqual(window.password.placeholderText(), 'Nhập mật khẩu')
+            self.assertEqual(window.config['cameras'][1]['password'], '')
+            response['data']['cameras'][1].update(state='retrying', message='Camera từ chối xác thực (401) [code=825242872]')
+            window.refresh()
+            self.assertTrue(window.error_card.isVisible())
+            self.assertIn('mật khẩu', window.error_message.text())
+            self.assertNotIn('code=', window.error_detail)
+            self.assertIn('Đang phát', window.output_badge.text())
+            self.assertIn('Meeting room', window.source_status.text())
+            response['data']['config']['cameras'][1]['address'] = None
+            window.config['cameras'][1]['address'] = None
+            window.populate()
+            self.assertTrue(window.keep_saved_address)
+            window.address.textEdited.emit('192.168.1.20')
+            self.assertFalse(window.keep_saved_address)
         finally:
             session.close()
 
@@ -104,6 +198,7 @@ class SessionTests(unittest.TestCase):
             window.config = {'ready': True}
             def invalid_bounds():
                 dialog = self.app.activeModalWidget()
+                self.assertFalse(dialog.findChildren(QComboBox))
                 fields = dialog.findChildren(QLineEdit)
                 fields[0].setText('192.168.1.30')
                 fields[1].setText('192.168.1.10')
@@ -116,6 +211,7 @@ class SessionTests(unittest.TestCase):
                 scan.assert_not_called()
             def valid_bounds():
                 dialog = self.app.activeModalWidget()
+                self.assertFalse(dialog.findChildren(QComboBox))
                 fields = dialog.findChildren(QLineEdit)
                 fields[0].setText('192.168.1.10')
                 fields[1].setText('192.168.1.30')
@@ -208,24 +304,27 @@ class SessionTests(unittest.TestCase):
             response['data']['cameras'][0]['state'] = 'connected'
             window.receive(response)
             self.assertTrue(session.want_output)
-            self.assertFalse(window.edit_button.isChecked())
+            self.assertFalse(hasattr(window, "edit_button"))
             session.output_running = True
             window.refresh()
             self.assertIn('Đang phát', window.cameras.item(0).text())
-            self.assertEqual(window.cameras.item(0).checkState(), Qt.CheckState.Checked)
-            window.cameras.item(0).setCheckState(Qt.CheckState.Unchecked)
+            self.assertFalse(window.cameras.item(0).flags() & Qt.ItemFlag.ItemIsUserCheckable)
+            window.toggle_output()
             self.assertFalse(session.want_output)
-            window.cameras.item(0).setCheckState(Qt.CheckState.Checked)
+            window.use_camera()
             self.assertEqual(session.commands.get_nowait()['command'], 'configure')
             window.busy = False
             window.use_stage = None
             response['data']['cameras'][0].update(state='retrying', message='Camera từ chối xác thực (401) [code=825242872]')
             window.refresh()
             self.assertNotIn('code=', window.source_status.text())
-            self.assertIn('mật khẩu', window.problems.toPlainText())
-            history = window.problems.toPlainText()
+            self.assertIn('mật khẩu', window.notice.text())
+            self.assertIn('#b42332', window.notice.styleSheet())
+            window.notice.setText('Kiểm tra RTSP thành công.')
+            self.assertIn('#166534', window.notice.styleSheet())
+            history = window.notice.text()
             window.refresh()
-            self.assertEqual(history, window.problems.toPlainText())
+            self.assertEqual(history, window.notice.text())
             self.assertNotIn('Đang phát', window.cameras.item(0).text())
             window.add_camera()
             self.assertEqual(window.config['cameras'][-1]['kind'], 'rtsp')

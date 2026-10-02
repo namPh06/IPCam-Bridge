@@ -4,7 +4,7 @@
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows11&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.3.5-2E8B57)
+![Version](https://img.shields.io/badge/version-0.3.10-2E8B57)
 ![Tests](https://img.shields.io/badge/tests-83%20passed-brightgreen)
 
 IP Camera Bridge nhận hình ảnh từ RTSP, video hoặc Test Pattern, hiển thị preview và xuất một camera đã chọn qua thiết bị **OBS Virtual Camera**. Ứng dụng hỗ trợ tối đa 16 nguồn, tự kết nối lại khi mất mạng và có thể hoạt động nền cùng Windows.
@@ -103,18 +103,18 @@ Gỡ ứng dụng trong **Settings → Apps → Installed apps**. OBS Studio là
 ## Thiết lập lần đầu
 
 1. **Thêm camera:** quét LAN hoặc nhập IP / URL RTSP, tên đăng nhập và mật khẩu riêng.
-2. **Kết nối và sử dụng:** tool lưu cấu hình nếu checkbox **Lưu cấu hình** được bật, kết nối camera rồi tự bật webcam ảo khi đã nhận hình.
+2. **Kết nối camera:** tool lưu cấu hình nếu checkbox **Lưu cấu hình** được bật, kết nối camera rồi tự bật webcam ảo khi đã nhận hình.
 3. **Trong Meet / Zoom:** chọn **OBS Virtual Camera**.
 
-Bật **Tự chạy khi đăng nhập Windows** trước khi bấm **Kết nối và sử dụng** để ghi nhớ lựa chọn. Service nhận camera khi Windows khởi động; bộ phát chạy sau đăng nhập.
+Bật **Tự chạy khi đăng nhập Windows** trước khi bấm **Kết nối camera** để ghi nhớ lựa chọn. Service nhận camera khi Windows khởi động; bộ phát chạy sau đăng nhập.
 
-**Lưu cấu hình** mặc định bật. Bỏ chọn để dùng tạm đến khi Windows Service khởi động lại; cấu hình đã lưu trước đó không bị xóa hay ghi đè. Bật tự chạy Windows sẽ tự bật lưu cấu hình. Sau khi chỉnh checkbox, bấm **Kết nối và sử dụng** để áp dụng.
+**Lưu cấu hình** mặc định bật. Bỏ chọn để dùng tạm đến khi Windows Service khởi động lại; cấu hình đã lưu trước đó không bị xóa hay ghi đè. Bật tự chạy Windows sẽ tự bật lưu cấu hình. Sau khi chỉnh checkbox, bấm **Kết nối camera** để áp dụng.
 
 Màn hình chính hiển thị trạng thái camera và webcam. **Đầu ra đã chọn** chỉ là lựa chọn nguồn; **Đang phát** chỉ hiện sau khi bộ phát báo hoạt động và nguồn đã kết nối. Bấm **Xem hình camera** khi cần kiểm tra hình, preview mặc định được ẩn.
 
 Ô mật khẩu luôn nhập được. Để trống sẽ giữ mật khẩu cũ; nhập mới sẽ thay mật khẩu khi lưu. Muốn xóa mật khẩu, dùng **Tác vụ khác → Xóa mật khẩu đã lưu**, sau đó lưu.
 
-Không có mạng camera? Dùng **Tác vụ khác → Thêm camera thử (Test Pattern)** rồi **Kết nối và sử dụng**. Khi thêm camera thật, RTSP là nguồn mặc định.
+Không có mạng camera? Dùng **Tác vụ khác → Thêm camera thử (Test Pattern)** rồi **Kết nối camera**. Khi thêm camera thật, RTSP là nguồn mặc định.
 
 ## Quét camera trong LAN
 
@@ -126,7 +126,7 @@ Nút **Quét camera LAN** nằm trong phần **1. Danh sách camera**.
 4. Tick các thiết bị cần thêm, kiểm tra **Mẫu đường dẫn** rồi bấm **Thêm camera đã tick**.
 5. URL RTSP được tạo tự động theo mẫu. Mặc định dành cho i-PRO / Panasonic: `/Src/MediaInput/stream_1`; đổi mẫu theo model khác nếu cần.
 6. Nhập tên đăng nhập và mật khẩu.
-7. Bấm **Kết nối và sử dụng**. Nếu cần xem hình, bấm **Xem hình camera**.
+7. Bấm **Kết nối camera**. Nếu cần xem hình, bấm **Xem hình camera**.
 
 Quét chỉ xác nhận thiết bị phản hồi giao thức RTSP, kể cả khi yêu cầu đăng nhập. Đường dẫn stream phụ thuộc hãng camera nên vẫn cần kiểm tra tài liệu của camera. Ví dụ:
 
@@ -154,7 +154,7 @@ Nếu không tìm thấy camera:
 
 5. Nhập **Tên đăng nhập** và **Mật khẩu** vào hai ô riêng.
 6. Chọn `720p` hoặc `1080p` tại **Đầu ra 25 fps**.
-7. Bấm **Kết nối và sử dụng**.
+7. Bấm **Kết nối camera**.
 
 Nhập mật khẩu ở dạng nguyên bản. Ví dụ, nếu mật khẩu chứa `@`, hãy nhập ký tự `@`; không đổi thành `%40`. Ứng dụng tự mã hóa ký tự đặc biệt đúng một lần khi tạo URL nội bộ.
 
@@ -165,25 +165,29 @@ Nhập mật khẩu ở dạng nguyên bản. Ví dụ, nếu mật khẩu chứ
 
 - Bấm **+ Thêm camera** hoặc **Quét camera LAN** để tạo tối đa 16 camera.
 - Vào **Tác vụ khác → Kết nối / ngắt tất cả** để nhận đồng thời các nguồn đã lưu.
-- **Tick một camera** trong danh sách để kết nối và phát. Tick camera khác sẽ chuyển nguồn; bỏ tick camera đang phát sẽ dừng webcam, các nguồn vẫn có thể tiếp tục kết nối.
-- Chọn dòng chỉ để sửa thông tin; việc này không đổi nguồn đang phát. Sau khi sửa, bấm **Kết nối và sử dụng** để áp dụng (và lưu nếu bật **Lưu cấu hình**).
+- **Chọn camera** trong danh sách rồi bấm **Kết nối camera** để phát. Biểu tượng và chữ màu xanh báo đang phát; màu đỏ báo lỗi. Bấm **Dừng phát** để dừng webcam.
+- Chọn dòng chỉ để sửa thông tin; việc này không đổi nguồn đang phát. Sau khi sửa, bấm **Kết nối camera** để áp dụng (và lưu nếu bật **Lưu cấu hình**).
 - Mỗi dòng hiển thị **Đang phát**, **Đang chuẩn bị phát**, **Đã kết nối · chưa phát** hoặc **Lỗi kết nối · cần kiểm tra**. Chỉ một camera phát tại một thời điểm.
 - Google Meet/Zoom vẫn sử dụng cùng một thiết bị **OBS Virtual Camera** khi chuyển camera.
 - Các thao tác ngắt nguồn, kết nối/ngắt tất cả và xóa camera nằm trong **Tác vụ khác**.
+
+Camera chưa nhập URL có thể giữ trong danh sách và được lưu cùng cấu hình; service bỏ qua camera đó khi tự kết nối. Camera được chọn để phát phải có URL hợp lệ.
 
 Ứng dụng xuất một camera tại một thời điểm. Các camera còn lại có thể tiếp tục kết nối để chuyển nguồn nhanh, tùy khả năng CPU và mạng của máy.
 
 ## Sử dụng trong Google Meet và Zoom
 
-### Trạng thái và lịch sử sự cố
+### Trạng thái và thông báo
 
-Phần **Trạng thái sử dụng** hiển thị camera đầu ra, kết nối và tình trạng webcam hiện tại. **Lịch sử sự cố** ghi giờ, camera gặp lỗi, nguyên nhân và việc cần kiểm tra; không đưa mã lỗi kỹ thuật vào biểu mẫu cấu hình. Ví dụ, lỗi đăng nhập sẽ yêu cầu kiểm tra tài khoản/mật khẩu; lỗi đường dẫn sẽ yêu cầu kiểm tra URL RTSP.
+Giao diện 0.3.9 có danh sách camera và ô tìm kiếm bên trái; cấu hình camera được chọn ở bên phải. Camera đang được sửa có thể khác camera đang phát. **Kiểm tra RTSP** áp dụng thông tin kết nối và kiểm tra nguồn, giữ camera đầu ra hiện tại; **Kết nối camera** kết nối và phát camera được chọn. Mật khẩu đã lưu được thể hiện bằng dấu chấm; nút hình mắt chỉ hiện/ẩn mật khẩu bạn vừa nhập, không đọc lại mật khẩu đã lưu. Quét LAN dùng hai ô IP bắt đầu và IP kết thúc nhập thủ công. Menu cài đặt ở góc trên phải chứa các tác vụ phụ.
 
-Log chẩn đoán có mã lỗi được ghi vào `%ProgramData%\IPCameraBridge\service\service.log` và `%LOCALAPPDATA%\IPCameraBridge\session.log`. Log không ghi mật khẩu hoặc nội dung ngoại lệ decoder nguyên bản. Lịch sử trên giao diện giữ tối đa 120 dòng trong phiên hiện tại.
+Phần **Trạng thái đầu ra** hiển thị camera đầu ra, kết nối và tình trạng webcam hiện tại. Khung thông báo hiển thị thông báo hiện tại: đỏ khi lỗi, xanh khi thành công; các bước đang xử lý dùng màu trung tính. Không có lịch sử sự cố trên giao diện.
+
+Log chẩn đoán có mã lỗi được ghi vào `%ProgramData%\IPCameraBridge\service\service.log` và `%LOCALAPPDATA%\IPCameraBridge\session.log`. Log không ghi mật khẩu hoặc nội dung ngoại lệ decoder nguyên bản.
 
 ### Google Meet
 
-1. Bấm **Kết nối và sử dụng** trong IP Camera Bridge.
+1. Bấm **Kết nối camera** trong IP Camera Bridge.
 2. Mở Google Meet.
 3. Chọn **Tùy chọn khác → Cài đặt → Video**.
 4. Tại **Máy ảnh**, chọn `OBS Virtual Camera`.
@@ -193,7 +197,7 @@ Nếu vừa cài OBS khi Chrome đang mở, hãy đóng toàn bộ cửa sổ Ch
 
 ### Zoom
 
-1. Bấm **Kết nối và sử dụng** trong IP Camera Bridge.
+1. Bấm **Kết nối camera** trong IP Camera Bridge.
 2. Mở **Zoom → Settings → Video**.
 3. Chọn `OBS Virtual Camera` trong danh sách Camera.
 4. Chọn microphone riêng trong **Audio**.
@@ -208,7 +212,7 @@ Một số ứng dụng chỉ đọc danh sách camera lúc khởi động. Nế
 Tự chạy khi đăng nhập Windows
 ```
 
-Sau đó bấm **Kết nối và sử dụng**; checkbox **Lưu cấu hình** sẽ được bật cùng tùy chọn tự chạy.
+Sau đó bấm **Kết nối camera**; checkbox **Lưu cấu hình** sẽ được bật cùng tùy chọn tự chạy.
 
 - Service `IPCameraBridgeCapture` tự chạy từ lúc Windows khởi động.
 - Camera được kết nối nền theo cấu hình đã lưu.

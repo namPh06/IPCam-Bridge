@@ -4,6 +4,7 @@ import queue
 import sys
 import types
 import unittest
+from uuid import uuid4
 from unittest.mock import patch
 
 from ip_camera_bridge import output
@@ -101,11 +102,12 @@ class OutputTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name == 'nt', 'Windows named mutex')
     def test_second_publisher_is_rejected_and_lock_releases(self):
-        with output._publisher_mutex():
+        name = 'Local\\IPCameraBridgePublisherTest-' + uuid4().hex
+        with output._publisher_mutex(name):
             with self.assertRaises(output._OutputError):
-                with output._publisher_mutex():
+                with output._publisher_mutex(name):
                     self.fail('Second publisher acquired the mutex')
-        with output._publisher_mutex():
+        with output._publisher_mutex(name):
             pass
 
 
