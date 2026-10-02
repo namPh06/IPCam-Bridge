@@ -140,9 +140,21 @@ def scan_network(value):
     return network
 
 
-def scan_rtsp(network, cancel, progress=None, port=554):
+def scan_range(start, end):
+    """Validate inclusive IPv4 bounds before making any network requests."""
+    first, last = ip_address(start.strip()), ip_address(end.strip())
+    if first.version != 4 or last.version != 4 or not 1 <= int(last) - int(first) + 1 <= 1024:
+        raise ValueError('Nhập IP bắt đầu và kết thúc theo thứ tự, tối đa 1024 địa chỉ IPv4.')
+    hosts = [ip_address(value) for value in range(int(first), int(last) + 1)]
+    if any(host.is_multicast or host.is_loopback or host.is_unspecified or host.is_link_local
+           or host.is_reserved for host in hosts):
+        raise ValueError('Dải IP chứa địa chỉ không dùng cho camera. Hãy chọn dải mạng hợp lệ.')
+    return hosts
+
+
+def scan_rtsp(network, cancel, progress=None, port=554, *, end=None):
     """Find RTSP responders, not merely open ports. No credentials are sent."""
-    hosts = list(scan_network(network).hosts())
+    hosts = scan_range(network, end) if end is not None else list(scan_network(network).hosts())
     def probe(host):
         if cancel.is_set():
             return None

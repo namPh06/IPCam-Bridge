@@ -1,5 +1,15 @@
 # Báo cáo kiểm thử IP Camera Bridge
 
+## Giao diện và quét LAN có giới hạn — 01/10/2026 (0.3.5)
+
+- **86/86 unittest đạt**, 9,601 giây; `pip check` không phát hiện dependency xung đột.
+- Test quét xác nhận chỉ kết nối IP trong hai giới hạn (bao gồm hai đầu), nhận camera trả RTSP 401, từ chối dải đảo ngược/IPv6/quá lớn trước khi mở socket. Dialog kiểm tra dải sai không chạy worker; dải hợp lệ truyền đúng giới hạn xuống scanner. Socket được mock, không phải nghiệm thu LAN công ty.
+- Qt offscreen kiểm tra chọn dòng không chuyển nguồn; Space/tick checkbox chuyển camera, chỉ một ô tick; bỏ tick dừng output. Lỗi 401 được thay bằng hướng dẫn kiểm tra, không đưa mã chẩn đoán vào trạng thái; refresh không nhân đôi lịch sử.
+- Mất kết nối dịch vụ xóa trạng thái thành công cũ. Log service có ID camera; log session ghi lỗi dịch vụ/bộ phát theo thông báo cố định. Bộ test bảo vệ mật khẩu/DPAPI/ghi nguyên tử vẫn đạt.
+- Đã xem ảnh giao diện quản lý và biểu mẫu cấu hình offscreen. Còn cần kiểm tra DPI thực, khởi động Windows, quét mạng công ty và chuyển hình trong Meet/Zoom trên máy đích.
+- PyInstaller và Inno Setup biên dịch thành công bộ cài `dist-service/IPCameraBridge-Setup.exe` (248.500.238 byte). SHA256: `CE5C96D6CE889FFB7DA84C379DD1886A951CB052E0B88A0280FB3143E3FEBC1A`.
+- Smoke chính EXE đóng gói với hai Test Pattern: cả hai `connected`, ảnh RGB 1280×720, 24,61 fps, Qt phản hồi, thoát mã 0. Phép thử không bật OBS và không thay đổi service đang cài; chưa cài lại bộ cài 0.3.5 trên máy đích.
+
 ## Windows Service — 29/09/2026
 
 - Toàn bộ **76/76 unittest đạt**, 10,255 giây. Bao gồm Windows DPAPI với tài khoản chạy test, named pipe thật, frame RGB có giới hạn, từ chối JSON/frame lỗi, reconnect, revision/save nguyên tử, lifecycle worker và hồi phục khóa bị bỏ lại. Test native Job Object xác nhận host thoát dọn tiến trình con.

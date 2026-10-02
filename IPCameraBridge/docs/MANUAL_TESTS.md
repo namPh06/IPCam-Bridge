@@ -1,5 +1,15 @@
 # Checklist nghiệm thu thủ công
 
+## Giao diện và quét có giới hạn — 0.3.5
+
+- [ ] Màn hình sáng và các hộp thoại đọc được khi Windows dùng Light/Dark, DPI 100%/150%, cửa sổ tối thiểu 800×600; bàn phím Tab/Space chọn được checkbox.
+- [ ] Chọn dòng camera để sửa không chuyển nguồn; tick camera khác chuyển nguồn. Chỉ một ô tick, nhãn **Đang phát** chỉ xuất hiện khi cả nguồn và bộ phát đều hoạt động.
+- [ ] Bỏ tick dừng webcam, nguồn khác không bị ngắt. Camera lỗi có nhãn riêng; lỗi 401/404 nêu việc cần kiểm tra và không hiển thị `[code=...]` trong form/trạng thái.
+- [ ] Mất liên lạc dịch vụ không giữ nhãn **Đang phát** cũ. Lịch sử sự cố không lặp mỗi lần UI refresh; log kỹ thuật xác định ID camera và không chứa mật khẩu.
+- [ ] Quét `.10` đến `.12` chỉ kiểm tra ba IP đó, gồm cả hai đầu. Dải đảo ngược, IPv6 và dải quá 1024 IP bị từ chối trước khi quét.
+- [ ] Dừng quét được, tiến độ hiển thị số IP đã kiểm tra; tick kết quả LAN để thêm và tạo URL theo mẫu. Cổng khác 554 cần thêm thủ công.
+- [ ] Thử trên LAN công ty và khác VLAN có routing được phép; không đánh dấu đạt chỉ dựa vào socket mock.
+
 ## Windows Service
 
 - [ ] Cài `IPCameraBridge-Setup.exe` từ tài khoản owner thường; UAC dùng cùng hoặc khác tài khoản quản trị vẫn giữ đúng owner.

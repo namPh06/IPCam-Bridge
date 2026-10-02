@@ -89,7 +89,8 @@ class OutputTests(unittest.TestCase):
              patch.object(output, '_publisher_mutex', return_value=contextlib.nullcontext()):
             output.run_output(types.SimpleNamespace(width=64, height=48), 25, statuses, ClockEvent(1))
         self.assertEqual(list(statuses.queue)[-1][0], 'error')
-        self.assertIn('pyvirtualcam', list(statuses.queue)[-1][1])
+        self.assertIn('cài lại IP Camera Bridge', list(statuses.queue)[-1][1])
+        self.assertNotIn('requirements', list(statuses.queue)[-1][1])
 
     def test_non_windows_has_friendly_error(self):
         statuses = queue.Queue()

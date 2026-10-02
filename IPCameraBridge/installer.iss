@@ -1,5 +1,5 @@
 #define AppName "IP Camera Bridge"
-#define AppVersion "0.3.4"
+#define AppVersion "0.3.5"
 #define OBSInstaller "OBS-Studio-32.2.2-Windows-x64-Installer.exe"
 
 [Setup]

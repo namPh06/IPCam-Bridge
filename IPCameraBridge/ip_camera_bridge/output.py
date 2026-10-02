@@ -37,7 +37,7 @@ def _publisher_mutex():
 
 def _backend_error(error):
     if isinstance(error, ImportError):
-        return 'Chưa tải được pyvirtualcam. Hãy cài lại các thư viện trong requirements.txt và OBS Studio (khuyến nghị 30 trở lên).'
+        return 'Bộ phát webcam bị thiếu thành phần. Hãy cài lại IP Camera Bridge và chọn cài OBS Studio trong bộ cài.'
     # Match known backend failures, but never forward third-party exception text.
     detail = str(error).lower()
     if 'device not found' in detail or 'did you install obs' in detail:

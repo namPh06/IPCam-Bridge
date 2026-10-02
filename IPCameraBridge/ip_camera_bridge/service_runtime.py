@@ -1,5 +1,6 @@
 """Single-owner capture state; the SCM thread owns all mutations."""
 import copy
+import logging
 import os
 from pathlib import Path
 import threading
@@ -28,6 +29,7 @@ class CaptureRuntime:
         self.snapshot = None
         self.closing = False
         self.transient = False
+        self.last_states = {}
 
     def start(self):
         camera_id = str(uuid4())
@@ -148,6 +150,13 @@ class CaptureRuntime:
                 except (ValueError, OSError, RuntimeError):
                     camera.source_state, camera.source_message = 'error', 'Không đọc được nguồn; đang chờ thử lại.'
                 self.retry[camera_id] = (now + min(30, 2 ** min(attempt, 5)), attempt + 1)
+        states = {}
+        for spec, camera in zip(self.config['cameras'], self.group.cameras):
+            state = (camera.source_state, camera.source_message)
+            states[spec['id']] = state
+            if self.last_states.get(spec['id']) != state:
+                logging.getLogger('ip_camera_bridge').info('Camera id=%s state=%s message=%s', spec['id'], *state)
+        self.last_states = states
         current = self.group.current
         stamp = current._frame_at if current.source_state == 'connected' else now
         self.sequence += 1

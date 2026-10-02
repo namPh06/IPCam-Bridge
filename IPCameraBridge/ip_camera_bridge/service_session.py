@@ -1,24 +1,27 @@
 """Owner-session publisher and tray UI; the service owns camera capture."""
 import copy
+import logging
 import multiprocessing as mp
 import queue
+import re
 import threading
 import time
+from ipaddress import ip_network
 from uuid import uuid4
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QFont, QImage, QPixmap
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
-from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
     QDialogButtonBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLayout, QLineEdit, QListWidget,
-    QListWidgetItem, QMainWindow, QMenu, QPushButton, QScrollArea, QStyle, QSystemTrayIcon,
+    QListWidgetItem, QMainWindow, QMenu, QPlainTextEdit, QPushButton, QScrollArea, QStyle, QSystemTrayIcon,
     QVBoxLayout, QWidget)
 
 from .controller import ManagedProcess
 from .config import validate_rtsp_url
 from .frames import SharedFrame, status_frame
 from .output import run_output
-from .onvif_discovery import discover_onvif, local_interfaces, scan_network, scan_rtsp
+from .onvif_discovery import local_interfaces, scan_range, scan_rtsp
 from .rtsp_address import DEFAULT_PATH, expand_rtsp_address
 from .service_config import migrate_profiles
 from .service_ipc import ServiceClient
@@ -28,9 +31,32 @@ ERRORS = {'source_busy': 'Ngắt nguồn trước khi sửa thông tin kết n�
           'stale_revision': 'Cấu hình đã thay đổi. Bấm Tải lại rồi chỉnh sửa.',
           'save_failed': 'Không lưu được cấu hình; dữ liệu trước đó được giữ nguyên.',
           'invalid_request': 'Kiểm tra địa chỉ, tên và thông tin camera.',
-          'offline': 'Chưa kết nối được Windows Service. Đang thử lại.',
+          'offline': 'Không kết nối được dịch vụ camera. Mở Services, kiểm tra IP Camera Bridge đang chạy; nếu không khởi động được, cài lại ứng dụng. Ứng dụng đang tự thử lại.',
           'migration_failed': 'Không chuyển được cấu hình cũ. Dữ liệu cũ vẫn được giữ.',
           'busy': 'Service đang bận. Hãy thử lại.', 'timeout': 'Chưa nhận được xác nhận; bấm Tải lại để kiểm tra.'}
+
+LOG = logging.getLogger('ip_camera_bridge')
+PROBLEM_STATES = ('error', 'failed', 'retrying', 'lost')
+
+
+def user_message(message):
+    """Decoder messages are fixed/safe; hide diagnostic codes and explain recovery."""
+    text = re.sub(r'\s*\[code=[^\]]*\]', '', message)
+    if '401' in text:
+        return 'Camera từ chối đăng nhập. Kiểm tra tên đăng nhập và mật khẩu; nhập mật khẩu nguyên bản, kể cả ký tự @.'
+    if '403' in text:
+        return 'Tài khoản không có quyền xem camera. Kiểm tra quyền xem luồng video trên trang quản trị camera.'
+    if '404' in text:
+        return 'Camera không tìm thấy luồng video. Kiểm tra đường dẫn RTSP hoặc mẫu đường dẫn của model camera.'
+    if 'từ chối kết nối TCP' in text:
+        return 'Camera từ chối kết nối. Kiểm tra cổng RTSP đã bật trên camera và cổng trong URL có đúng không.'
+    if 'bộ giải mã' in text:
+        return 'Không giải mã được video. Chọn H.264 trên camera và thử lại; nếu vẫn lỗi, cập nhật hoặc cài lại ứng dụng.'
+    if 'kết thúc luồng video' in text:
+        return 'Camera đã ngừng gửi video. Kiểm tra camera có bị khởi động lại hoặc vượt giới hạn số kết nối không; thử lại URL trong VLC.'
+    if any(word in text.lower() for word in ('không mở', 'không đọc', 'không hợp lệ', 'hết thời gian', 'mất kết nối')):
+        return text + '\nCần kiểm tra: IP, cổng và đường dẫn RTSP; thử cùng URL trong VLC, kiểm tra mạng/VLAN và quyền truy cập camera.'
+    return text
 
 
 class ServiceSession:
@@ -167,10 +193,16 @@ class ServiceSession:
                     self.want_output = response['data']['config']['auto_connect']
                 if self.window:
                     self.window.receive(response)
-            elif self.window:
-                self.window.notice.setText(ERRORS.get(response.get('code'), 'Không thực hiện được yêu cầu.'))
-                self.window.busy = False
-                self.window.use_stage = None
+            else:
+                message = ERRORS.get(response.get('code'), 'Không thực hiện được yêu cầu. Tải lại cấu hình và thử lại.')
+                LOG.warning('Service request failed code=%s recovery=%s', response.get('code'), message)
+                if response.get('code') == 'offline':
+                    self.status = None
+                if self.window:
+                    self.window.notice.setText(message)
+                    self.window.record_problem('Dịch vụ camera', response.get('code', 'unknown'), message)
+                    self.window.busy = False
+                    self.window.use_stage = None
         with self.lock:
             incoming, self.incoming = self.incoming, None
         if incoming and incoming[0] == self.pid:
@@ -179,6 +211,7 @@ class ServiceSession:
             self.image = status_frame(self.shared.width, self.shared.height, 'MAT KET NOI')
         was_active = self.output.active
         for state, message in self.output.poll():
+            LOG.info('Webcam state=%s message=%s', state, message)
             self.output_message = message
             self.output_running = state == 'running'
             if state == 'running':
@@ -240,6 +273,7 @@ class ServiceWindow(QMainWindow):
         self.session, self.config, self.index, self.busy = session, None, 0, False
         self.use_stage = None
         self.use_camera_id = None
+        self.problem_events = {}
         self.setWindowTitle('IP Camera Bridge — Windows Service')
         self.resize(1050, 740)
         self.setMinimumSize(800, 600)
@@ -260,10 +294,17 @@ class ServiceWindow(QMainWindow):
             QPushButton#primaryButton { color: white; background: #0b57d0; border-color: #0b57d0;
                                         font-weight: 600; }
             QPushButton#primaryButton:hover { background: #0949b4; }
+            QPushButton#primaryButton:disabled { color: #68758a; background: #e2e8f1; border-color: #d7dde6; }
             QPushButton#stopButton { color: #a1261d; background: #fff5f4; border-color: #e4a39d;
                                      font-weight: 600; }
             QLabel#heading { font-size: 24px; font-weight: 700; color: #10213b; }
             QLabel#muted { color: #5d6b80; }
+            QListWidget, QPlainTextEdit { border: 1px solid #bcc8d8; border-radius: 5px; background: white; }
+            QListWidget::item { padding: 10px 8px; border-bottom: 1px solid #edf0f4; }
+            QListWidget::item:selected { background: #e8f0fe; color: #10213b; }
+            QListWidget::item:hover { background: #f0f5fc; }
+            QLineEdit:focus, QComboBox:focus, QListWidget:focus, QPushButton:focus { border: 2px solid #0b57d0; }
+            QCheckBox { spacing: 8px; min-height: 28px; }
         ''')
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -284,12 +325,14 @@ class ServiceWindow(QMainWindow):
         subtitle.setObjectName('muted')
         layout.addWidget(subtitle)
 
-        camera_box = QGroupBox('1. Chọn và cấu hình camera')
+        camera_box = QGroupBox('1. Danh sách camera')
         camera_layout = QVBoxLayout(camera_box)
         row = QHBoxLayout()
-        self.cameras = QComboBox()
-        self.cameras.setAccessibleName('Chọn camera; trạng thái phát được ghi cạnh tên')
-        self.cameras.currentIndexChanged.connect(self.select_editor)
+        self.cameras = QListWidget()
+        self.cameras.setFixedHeight(100)
+        self.cameras.setAccessibleName('Danh sách camera. Tick một camera để phát; chọn dòng để sửa thông tin.')
+        self.cameras.currentRowChanged.connect(self.select_editor)
+        self.cameras.itemChanged.connect(self.choose_output)
         row.addWidget(self.cameras, 1)
         for label, callback in (('+ Thêm camera', self.add_camera), ('Quét camera LAN', self.scan_lan)):
             button = QPushButton(label)
@@ -298,6 +341,10 @@ class ServiceWindow(QMainWindow):
             if callback == self.scan_lan:
                 self.scan_button = button
         camera_layout.addLayout(row)
+        hint = QLabel('Tick camera để kết nối và phát. Chỉ một camera phát tại một thời điểm; chọn dòng để sửa thông tin.')
+        hint.setWordWrap(True)
+        hint.setObjectName('muted')
+        camera_layout.addWidget(hint)
         self.edit_button = QPushButton('Ẩn thông tin camera')
         self.edit_button.setCheckable(True)
         self.edit_button.setChecked(True)
@@ -348,7 +395,7 @@ class ServiceWindow(QMainWindow):
         self.save_button = QPushButton('Kết nối và sử dụng')
         self.save_button.setObjectName('primaryButton')
         self.save_button.clicked.connect(self.use_camera)
-        more = QPushButton('Tác vụ khác ▾')
+        more = QPushButton('Tác vụ khác')
         menu = QMenu(more)
         menu.addAction('Thêm camera thử (Test Pattern)').triggered.connect(self.add_test_camera)
         menu.addAction('Ngắt camera đang chọn').triggered.connect(lambda: self.selected_command('disconnect'))
@@ -367,12 +414,15 @@ class ServiceWindow(QMainWindow):
         status_layout = QVBoxLayout(status_box)
         self.source_status = QLabel('Chọn camera rồi bấm Kết nối và sử dụng.')
         self.source_status.setWordWrap(True)
+        self.source_status.setTextFormat(Qt.TextFormat.PlainText)
         self.output_status = QLabel('Webcam ảo chưa bật.')
         self.output_status.setWordWrap(True)
+        self.output_status.setTextFormat(Qt.TextFormat.PlainText)
         status_layout.addWidget(self.source_status)
         status_layout.addWidget(self.output_status)
         controls = QHBoxLayout()
         self.output_button = QPushButton('Dừng phát')
+        self.output_button.setObjectName('stopButton')
         self.output_button.clicked.connect(self.toggle_output)
         controls.addWidget(self.output_button)
         self.preview_button = QPushButton('Xem hình camera')
@@ -380,6 +430,18 @@ class ServiceWindow(QMainWindow):
         controls.addWidget(self.preview_button)
         controls.addStretch()
         status_layout.addLayout(controls)
+        self.problem_button = QPushButton('Lịch sử sự cố')
+        self.problem_button.setCheckable(True)
+        self.problem_button.setToolTip('Xem nguyên nhân và việc cần kiểm tra. Không hiển thị mã lỗi kỹ thuật.')
+        controls.addWidget(self.problem_button)
+        self.problems = QPlainTextEdit()
+        self.problems.setReadOnly(True)
+        self.problems.setMaximumBlockCount(120)
+        self.problems.setFixedHeight(140)
+        self.problems.setAccessibleName('Lịch sử sự cố và hướng dẫn kiểm tra')
+        self.problems.hide()
+        self.problem_button.toggled.connect(self.problems.setVisible)
+        status_layout.addWidget(self.problems)
         layout.addWidget(status_box)
 
         preview_box = QGroupBox('Xem trước camera đang xuất')
@@ -394,11 +456,12 @@ class ServiceWindow(QMainWindow):
         self.state.setWordWrap(True)
         self.state.setObjectName('muted')
         self.notice.setWordWrap(True)
+        self.notice.setTextFormat(Qt.TextFormat.PlainText)
         preview_layout.addWidget(self.preview, 1)
         preview_layout.addWidget(self.state)
         layout.addWidget(preview_box, 1)
         layout.addWidget(self.notice)
-        guide = QLabel('Meet / Zoom: chọn camera “OBS Virtual Camera”. Nếu báo camera đang được dùng, hãy đóng Zoom, Teams, Windows Camera và OBS; sau đó tải lại trang Meet và bấm Thử lại.')
+        guide = QLabel('Trong Meet / Zoom, chọn “OBS Virtual Camera”. OBS chỉ cần cài sẵn; không bật Virtual Camera trong OBS khi tool đang phát.')
         guide.setWordWrap(True)
         guide.setStyleSheet('padding: 9px; color: #604600; background: #fff7d6; border: 1px solid #ead074; border-radius: 6px;')
         layout.addWidget(guide)
@@ -466,7 +529,7 @@ class ServiceWindow(QMainWindow):
                 self.edit_button.setChecked(False)
                 self.notice.setText('Đã kết nối. Đang khởi động webcam ảo…')
             elif camera:
-                self.notice.setText(camera['message'])
+                self.notice.setText(user_message(camera['message']))
                 if camera['state'] in ('error', 'failed', 'retrying', 'lost'):
                     self.use_stage = None
                     self.edit_button.setChecked(True)
@@ -483,13 +546,19 @@ class ServiceWindow(QMainWindow):
             camera['kind'] = 'rtsp'
         self.config['resolution'], self.config['auto_connect'] = self.resolution.currentData(), self.auto.isChecked()
 
-    def populate(self):
-        self.cameras.blockSignals(True)
-        self.cameras.clear()
-        self.cameras.addItems([camera['name'] + (' · Đầu ra đã chọn' if camera['id'] == self.config['selected_id'] else '')
-                               for camera in self.config['cameras']])
-        self.cameras.setCurrentIndex(self.index)
-        self.cameras.blockSignals(False)
+    def populate(self, rebuild=True):
+        if rebuild:
+            self.cameras.blockSignals(True)
+            self.cameras.clear()
+            for camera in self.config['cameras']:
+                item = QListWidgetItem(camera['name'])
+                item.setData(Qt.ItemDataRole.UserRole, camera['id'])
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                item.setCheckState(Qt.CheckState.Unchecked)
+                self.cameras.addItem(item)
+            self.cameras.setCurrentRow(self.index)
+            self.cameras.blockSignals(False)
+            self.cameras.setFixedHeight(min(170, max(90, len(self.config['cameras']) * 38 + 4)))
         camera = self.config['cameras'][self.index]
         self.name.setText(camera['name'])
         self.address.setText(camera['address'] or '')
@@ -499,12 +568,32 @@ class ServiceWindow(QMainWindow):
         self.password.setText(camera['password'] or '')
         self.resolution.setCurrentIndex(self.resolution.findData(self.config['resolution']))
         self.auto.setChecked(self.config['auto_connect'])
+        self.refresh()
+
+    def choose_output(self, item):
+        if not self.config or self.busy or self.use_stage:
+            return
+        if item.checkState() == Qt.CheckState.Checked:
+            index = self.cameras.row(item)
+            if index != self.index:
+                self.cameras.setCurrentRow(index)
+            self.use_camera()
+        elif self.session.status and item.data(Qt.ItemDataRole.UserRole) == self.session.status['data']['config']['selected_id']:
+            self.session.stop_output()
+        self.refresh()
+
+    def record_problem(self, key, state, message):
+        if self.problem_events.get(key) == (state, message):
+            return
+        self.problem_events[key] = (state, message)
+        self.problems.appendPlainText(f'[{time.strftime("%H:%M:%S")}] {message}')
+        self.problem_button.setText('Lịch sử sự cố · có thông báo')
 
     def select_editor(self, index):
         if self.config and index >= 0:
             self.capture()
             self.index = index
-            self.populate()
+            self.populate(rebuild=False)
 
     def add_camera(self):
         if self.busy or self.use_stage or not self.config or len(self.config['cameras']) >= MAX_CAMERAS:
@@ -577,60 +666,71 @@ class ServiceWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle('Quét camera LAN')
         layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel('Chọn card mạng hoặc quét dải IP camera.'))
+        layout.addWidget(QLabel('Chỉ quét các địa chỉ từ IP bắt đầu đến IP kết thúc (bao gồm cả hai).'))
         interfaces = local_interfaces()
         adapter = QComboBox()
-        adapter.addItem('Tất cả card mạng đang hoạt động', None)
+        adapter.addItem('Nhập dải IP thủ công', None)
         for name, address, network in interfaces:
             adapter.addItem(f'{name} — {address}', (address, network))
         layout.addWidget(adapter)
-        tcp = QCheckBox('Quét thêm RTSP theo dải IP (kể cả khác VLAN)')
-        layout.addWidget(tcp)
-        subnet = QLineEdit()
-        subnet.setPlaceholderText('Ví dụ: 192.168.100.0/24 — tối đa 1024 địa chỉ')
-        subnet.setEnabled(False)
-        tcp.toggled.connect(subnet.setEnabled)
-        adapter.currentIndexChanged.connect(lambda: subnet.setText(adapter.currentData()[1]) if adapter.currentData() else None)
-        layout.addWidget(subnet)
-        hint = QLabel('Khác VLAN cần được router/firewall cho phép truy cập. RTSP quét cổng 554; tìm thấy thiết bị chưa có nghĩa là đã xác nhận đường dẫn stream.')
+        first, last = QLineEdit(), QLineEdit()
+        first.setPlaceholderText('192.168.100.1')
+        last.setPlaceholderText('192.168.100.254')
+        form = QGridLayout()
+        for row, (label, field) in enumerate((('IP bắt đầu', first), ('IP kết thúc', last))):
+            field.setAccessibleName(label)
+            caption = QLabel(label)
+            caption.setBuddy(field)
+            form.addWidget(caption, row, 0)
+            form.addWidget(field, row, 1)
+        layout.addLayout(form)
+        def suggest_range():
+            if adapter.currentData():
+                address, subnet = adapter.currentData()
+                network = ip_network(subnet)
+                if network.num_addresses > 1024:
+                    network = ip_network(f'{address}/24', strict=False)
+                hosts = list(network.hosts())
+                first.setText(str(hosts[0]))
+                last.setText(str(hosts[-1]))
+        adapter.currentIndexChanged.connect(suggest_range)
+        if interfaces:
+            adapter.setCurrentIndex(1)
+        hint = QLabel('Tối đa 1024 địa chỉ. Kiểm tra RTSP tại cổng 554, không gửi tài khoản/mật khẩu. Khác VLAN cần router/firewall cho phép truy cập. Không quét ONVIF multicast ngoài dải đã nhập.')
         hint.setWordWrap(True)
         layout.addWidget(hint)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText('Bắt đầu quét')
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText('Hủy')
         def accept():
-            if tcp.isChecked():
-                try:
-                    scan_network(subnet.text())
-                except ValueError:
-                    hint.setText('Dải IPv4 không hợp lệ hoặc quá lớn. Ví dụ: 192.168.100.0/24 (tối đa 1024 địa chỉ).')
-                    return
+            try:
+                hosts = scan_range(first.text(), last.text())
+            except ValueError:
+                # Validation errors contain fixed messages, never input/credentials.
+                hint.setText('Dải IP không hợp lệ. Nhập hai địa chỉ IPv4 từ nhỏ đến lớn, tối đa 1024 địa chỉ; ví dụ 192.168.100.1 đến 192.168.100.254.')
+                first.setFocus()
+                return
+            self.scan_bounds = (str(hosts[0]), str(hosts[-1]))
             dialog.accept()
         buttons.accepted.connect(accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
-        selected = [adapter.currentData()[0]] if adapter.currentData() else [entry[1] for entry in interfaces]
-        target = subnet.text().strip() if tcp.isChecked() else None
+        start, end = self.scan_bounds
         self.discovery_cancel.clear()
-        self.discovery_progress = 'Đang quét ONVIF trên card mạng đã chọn…'
+        self.discovery_progress = f'Đang quét {start} → {end}…'
         self.scan_button.setText('Dừng quét LAN')
+        self.scan_button.setObjectName('stopButton')
+        self.scan_button.style().unpolish(self.scan_button)
+        self.scan_button.style().polish(self.scan_button)
         def worker():
             try:
-                try:
-                    result = discover_onvif(interfaces=selected, cancel=self.discovery_cancel)
-                except OSError:
-                    if not target:
-                        raise
-                    result = []
-                if target and not self.discovery_cancel.is_set():
-                    def progress(done, total):
-                        self.discovery_progress = f'Đang quét RTSP: {done}/{total} địa chỉ…'
-                    devices = {device.host: device for device in result}
-                    for device in scan_rtsp(target, self.discovery_cancel, progress):
-                        devices.setdefault(device.host, device)
-                    result = list(devices.values())
+                def progress(done, total):
+                    self.discovery_progress = f'Đang quét {start} → {end}: {done}/{total} địa chỉ…'
+                result = scan_rtsp(start, self.discovery_cancel, progress, end=end)
             except (OSError, ValueError):
+                LOG.warning('LAN range scan failed; check network and firewall')
                 result = None
             self.discovery_results.put(result)
         threading.Thread(target=worker, daemon=True).start()
@@ -645,36 +745,53 @@ class ServiceWindow(QMainWindow):
         self.discovery_timer.stop()
         self.scan_button.setEnabled(True)
         self.scan_button.setText('Quét camera LAN')
+        self.scan_button.setObjectName('')
+        self.scan_button.style().unpolish(self.scan_button)
+        self.scan_button.style().polish(self.scan_button)
         if self.discovery_cancel.is_set():
             self.notice.setText('Đã dừng quét LAN.')
             return
         if devices is None:
-            self.notice.setText('Không quét được LAN. Kiểm tra mạng và quyền Windows Firewall.')
+            message = 'Không quét được LAN. Kiểm tra kết nối mạng và quyền Windows Firewall.'
+            self.notice.setText(message)
+            self.record_problem('Quét LAN', 'error', message)
+            return
+        if not self.config:
+            self.notice.setText('Cấu hình đang được tải lại. Hãy quét lại khi danh sách camera đã sẵn sàng.')
             return
         if not devices:
-            self.notice.setText('Không tìm thấy camera. Thử chọn đúng card mạng hoặc quét dải IP bằng RTSP; kiểm tra VLAN/firewall. Bạn vẫn có thể nhập IP thủ công.')
+            message = 'Không tìm thấy camera trong dải đã nhập. Kiểm tra dải IP camera, cổng RTSP 554, mạng/VLAN và firewall. Camera dùng cổng khác cần thêm IP:cổng thủ công.'
+            self.notice.setText(message)
+            self.record_problem('Quét LAN', 'empty', message)
             return
         dialog = QDialog(self)
         dialog.setWindowTitle('Kết quả quét camera')
         dialog.resize(620, 360)
         layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel('Chọn camera. URL sẽ được tạo theo mẫu bên dưới; nhập tài khoản sau khi thêm.'))
+        layout.addWidget(QLabel('Tick camera cần thêm. URL sẽ được tạo theo mẫu bên dưới; nhập tài khoản sau khi thêm.'))
         template = QLineEdit(self.rtsp_path.text())
         layout.addWidget(QLabel('Mẫu đường dẫn (mặc định i-PRO / Panasonic)'))
         layout.addWidget(template)
         choices = QListWidget()
-        choices.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         for device in devices:
             item = QListWidgetItem(f'{device.name} — {device.host}')
             item.setData(Qt.ItemDataRole.UserRole, device)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
             choices.addItem(item)
         layout.addWidget(choices)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText('Thêm camera đã tick')
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText('Hủy')
+        def checked_items():
+            return [choices.item(index) for index in range(choices.count())
+                    if choices.item(index).checkState() == Qt.CheckState.Checked]
         def accept_devices():
-            if not choices.selectedItems():
+            if not checked_items():
                 return
             try:
-                expand_rtsp_address(choices.selectedItems()[0].data(Qt.ItemDataRole.UserRole).host, template.text())
+                for item in checked_items():
+                    expand_rtsp_address(item.data(Qt.ItemDataRole.UserRole).host, template.text())
             except ValueError:
                 template.setFocus()
                 return
@@ -689,8 +806,8 @@ class ServiceWindow(QMainWindow):
         added = 0
         empty_first = self.config['revision'] == 0 and len(self.config['cameras']) == 1 and self.config['cameras'][0]['kind'] == 'rtsp' and not self.config['cameras'][0]['address']
         addresses = {camera.get('address') for camera in self.config['cameras']}
-        for item in choices.selectedItems():
-            if len(self.config['cameras']) >= MAX_CAMERAS:
+        for item in checked_items():
+            if not empty_first and len(self.config['cameras']) >= MAX_CAMERAS:
                 break
             device = item.data(Qt.ItemDataRole.UserRole)
             address = expand_rtsp_address(device.host, template.text())
@@ -774,9 +891,15 @@ class ServiceWindow(QMainWindow):
         name = next((c['name'] for c in data['config']['cameras'] if c['id'] == selected_id), 'Chưa chọn') if data else 'Chưa chọn'
         connected = bool(camera and camera['state'] == 'connected')
         running = bool(self.session.output_running and connected and self.session.want_output)
-        self.source_status.setText(f'Camera đầu ra: {name}\nKết nối: {camera["message"]} · {camera["fps"]} fps' if camera else 'Chưa kết nối được dịch vụ camera.')
+        self.source_status.setText(f'Camera đầu ra: {name}\nKết nối: {user_message(camera["message"])} · {camera["fps"]} fps' if camera else ERRORS['offline'])
         self.source_status.setStyleSheet('color: #176b3a;' if connected else 'color: #8a5a00;')
-        self.output_status.setText('Đang phát qua OBS Virtual Camera. Chọn thiết bị này trong Meet / Zoom.' if running else self.session.output_message)
+        if running:
+            output_message = 'Đang phát qua OBS Virtual Camera. Chọn thiết bị này trong Meet / Zoom.'
+        elif self.session.output_running and self.session.want_output:
+            output_message = 'Webcam đã mở nhưng chưa có hình camera. Kiểm tra kết nối nguồn và dịch vụ camera.'
+        else:
+            output_message = self.session.output_message
+        self.output_status.setText(output_message)
         if running and self.notice.text() == 'Đã kết nối. Đang khởi động webcam ảo…':
             self.notice.setText('Sẵn sàng sử dụng trong Meet / Zoom.')
         self.output_status.setStyleSheet('color: #176b3a; font-weight: 600;' if running else 'color: #5d6b80;')
@@ -788,16 +911,48 @@ class ServiceWindow(QMainWindow):
         self.auto.setEnabled(not self.busy and not self.use_stage)
         self.editor.setEnabled(not self.busy and not self.use_stage)
         self.cameras.setEnabled(not self.busy and not self.use_stage)
+        states = {c['id']: c for c in data['cameras']} if data else {}
+        self.cameras.blockSignals(True)
         for index in range(self.cameras.count() if self.config else 0):
             profile = self.config['cameras'][index]
-            suffix = (' · Đang phát' if running else ' · Đầu ra đã chọn') if profile['id'] == selected_id else ''
-            self.cameras.setItemText(index, profile['name'] + suffix)
+            source = states.get(profile['id'])
+            selected = profile['id'] == selected_id
+            pending = bool(self.use_stage and profile['id'] == self.use_camera_id)
+            checked = pending or (selected and self.session.want_output and not self.use_stage)
+            if selected and running and not self.use_stage:
+                suffix = 'Đang phát'
+            elif pending:
+                suffix = 'Đang chuẩn bị phát'
+            elif source and source['state'] in PROBLEM_STATES:
+                suffix = 'Lỗi kết nối · cần kiểm tra'
+            elif source and source['state'] == 'connected':
+                suffix = 'Đã kết nối · chưa phát'
+            elif source and source.get('wanted'):
+                suffix = 'Đang kết nối'
+            else:
+                suffix = 'Chưa kết nối'
+            item = self.cameras.item(index)
+            item.setText(profile['name'] + ' · ' + suffix)
+            item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+            item.setToolTip(user_message(source['message']) if source else 'Tick để kết nối và phát camera này.')
+            if source and source['state'] in PROBLEM_STATES:
+                self.record_problem(profile['id'], source['state'], f'{profile["name"]}: {user_message(source["message"])}')
+            else:
+                self.problem_events.pop(profile['id'], None)
+        self.cameras.blockSignals(False)
+        if self.session.want_output and not self.session.output_running and any(word in self.session.output_message.lower() for word in ('không', 'thiếu', 'khóa', 'khác')):
+            self.record_problem('Webcam', 'error', 'Webcam ảo: ' + self.session.output_message)
+        else:
+            self.problem_events.pop('Webcam', None)
+        if data:
+            self.problem_events.pop('Dịch vụ camera', None)
         self.state.setText(f'Hình từ camera đầu ra: {name}')
 
     def closeEvent(self, event):
         event.ignore()
         # Never persist an unfinished form or stop the service when hiding the window.
         self.use_stage = None
+        self.discovery_cancel.set()
         self.config = None
         self.password.clear()
         self.hide()
@@ -812,6 +967,11 @@ def run_service_session(hidden=False, stop_only=False):
     if not policy or policy['owner_sid'] != sid or session_id == 0:
         return 1
     app = QApplication.instance() or QApplication([])
+    from .config import setup_logging
+    from .ui import data_directory
+    setup_logging(data_directory() / 'session.log')
+    app.setStyle('Fusion')
+    app.setFont(QFont('Segoe UI', 10))
     app.setQuitOnLastWindowClosed(False)
     name = f'IPCameraBridge-{sid}-{session_id}'
     mutex = win32event.CreateMutex(None, False, 'Local\\' + name)

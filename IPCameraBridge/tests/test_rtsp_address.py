@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 from ip_camera_bridge.rtsp_address import expand_rtsp_address
-from ip_camera_bridge.onvif_discovery import scan_network, scan_rtsp, discover_onvif
+from ip_camera_bridge.onvif_discovery import scan_network, scan_range, scan_rtsp, discover_onvif
 from ip_camera_bridge.config import build_rtsp_url
 
 
@@ -30,6 +30,23 @@ class AddressTests(unittest.TestCase):
         with patch('ip_camera_bridge.onvif_discovery.socket.create_connection') as connect:
             self.assertEqual(scan_rtsp('192.168.1.0/30', cancel), [])
             connect.assert_not_called()
+
+    def test_explicit_range_is_inclusive_bounded_and_probes_only_that_range(self):
+        self.assertEqual([str(host) for host in scan_range('192.168.1.10', '192.168.1.12')],
+                         ['192.168.1.10', '192.168.1.11', '192.168.1.12'])
+        for first, last in [('192.168.1.12', '192.168.1.10'), ('10.0.0.1', '10.0.4.1'),
+                            ('127.0.0.1', '127.0.0.2'), ('::1', '::2'), ('bad', '192.168.1.2'),
+                            ('169.254.0.1', '169.254.0.1')]:
+            with self.subTest(first=first), self.assertRaises(ValueError):
+                scan_range(first, last)
+        sock = MagicMock()
+        sock.__enter__.return_value = sock
+        sock.recv.return_value = b'RTSP/1.0 401 Unauthorized\r\n'
+        with patch('ip_camera_bridge.onvif_discovery.socket.create_connection', return_value=sock) as connect:
+            result = scan_rtsp('192.168.1.10', threading.Event(), end='192.168.1.12')
+        self.assertEqual({call.args[0] for call in connect.call_args_list},
+                         {('192.168.1.10', 554), ('192.168.1.11', 554), ('192.168.1.12', 554)})
+        self.assertEqual(len(result), 3)
 
     def test_rtsp_response_required_and_auth_challenge_is_detected(self):
         sock = MagicMock()

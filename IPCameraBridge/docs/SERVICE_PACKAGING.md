@@ -1,5 +1,12 @@
 # Đóng gói bản Windows Service
 
+## Bản 0.3.5
+
+- Quét LAN bằng hai giới hạn IPv4 bắt đầu/kết thúc, bao gồm hai đầu và tối đa 1024 địa chỉ. Chỉ kiểm tra RTSP cổng 554 trong dải nhập; không gửi ONVIF multicast. Chọn card mạng chỉ gợi ý dải, Windows vẫn định tuyến kết nối TCP.
+- Danh sách camera có checkbox: tick camera để kết nối/phát, tick camera khác để chuyển nguồn, bỏ tick để dừng webcam. Chọn dòng chỉ mở thông tin để sửa; không đổi nguồn.
+- Trạng thái phân biệt nguồn đã kết nối với webcam đang phát, không giữ trạng thái thành công cũ khi mất dịch vụ. Giao diện sáng dùng Fusion và font Segoe UI thống nhất.
+- Lịch sử sự cố nằm trong phần trạng thái, nêu nguyên nhân và hướng kiểm tra. Mã chẩn đoán giữ trong `service.log` (kèm ID camera) và `session.log`; không ghi thông tin đăng nhập.
+
 ## Bản 0.3.4
 
 - Chỉ cửa sổ cài chính hiển thị. Tiến trình quản trị chạy với `/VERYSILENT`; lựa chọn cài OBS được chuyển từ cửa sổ chính. Hộp thoại UAC vẫn hiện khi cần quyền quản trị.

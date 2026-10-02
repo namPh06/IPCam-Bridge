@@ -4,7 +4,7 @@
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows11&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.3.4-2E8B57)
+![Version](https://img.shields.io/badge/version-0.3.5-2E8B57)
 ![Tests](https://img.shields.io/badge/tests-83%20passed-brightgreen)
 
 IP Camera Bridge nhận hình ảnh từ RTSP, video hoặc Test Pattern, hiển thị preview và xuất một camera đã chọn qua thiết bị **OBS Virtual Camera**. Ứng dụng hỗ trợ tối đa 16 nguồn, tự kết nối lại khi mất mạng và có thể hoạt động nền cùng Windows.
@@ -31,9 +31,13 @@ IP Camera Bridge nhận hình ảnh từ RTSP, video hoặc Test Pattern, hiển
 | Chức năng | Mô tả |
 |---|---|
 | Nguồn RTSP | Nhận H.264/H.265 và các luồng video được FFmpeg/PyAV hỗ trợ qua RTSP TCP. |
-| Quét LAN | ONVIF trên nhiều card mạng; tùy chọn quét RTSP theo dải IP tối đa 1024 địa chỉ. |
-| Nhiều camera | Lưu tối đa 16 nguồn và chọn một camera để xuất tại mỗi thời điểm. |
-| Webcam ảo | Xuất hình qua **OBS Virtual Camera** cho Meet, Zoom và ứng dụng tương thích webcam Windows. |
+
+| Quét LAN | Nhập IP bắt đầu và IP kết thúc; chỉ quét RTSP trong dải đó, tối đa 1024 địa chỉ.|
+
+| Nhiều camera | Lưu tối đa 16 nguồn và chọn một camera để xuất tại mỗi thời điểm.|
+
+| Webcam ảo | Xuất hình qua **OBS Virtual Camera** cho Meet, Zoom và ứng dụng tương thích webcam Windows.|
+
 | Windows Service | Tự nhận camera khi Windows khởi động và tự bật webcam sau khi người dùng đăng nhập. |
 | Tự phục hồi | Liên tục thử kết nối lại khi camera hoặc mạng bị gián đoạn. |
 | Bảo vệ mật khẩu | Mã hóa cấu hình camera bằng Windows DPAPI; không ghi mật khẩu vào log. |
@@ -114,17 +118,17 @@ Không có mạng camera? Dùng **Tác vụ khác → Thêm camera thử (Test P
 
 ## Quét camera trong LAN
 
-Nút **Quét camera LAN** nằm trong phần **1. Chọn và cấu hình camera**.
+Nút **Quét camera LAN** nằm trong phần **1. Danh sách camera**.
 
-1. Bấm **Quét camera LAN**, chọn card mạng hoặc giữ **Tất cả card mạng đang hoạt động**.
-2. Nếu cần tìm thiết bị không phản hồi ONVIF hoặc khác VLAN, bật **Quét thêm RTSP theo dải IP** rồi nhập dải, ví dụ `192.168.100.0/24`. Quét tối đa 1024 địa chỉ qua cổng 554; khác VLAN cần routing/firewall cho phép.
+1. Bấm **Quét camera LAN**. Chọn một card mạng để gợi ý dải IP hoặc chọn **Nhập dải IP thủ công**. Windows quyết định đường đi mạng theo bảng định tuyến.
+2. Nhập **IP bắt đầu**, ví dụ `192.168.100.1`, và **IP kết thúc**, ví dụ `192.168.100.254`. Quét bao gồm hai đầu, tối đa 1024 địa chỉ qua cổng 554; khác VLAN cần routing/firewall cho phép. Không gửi probe ONVIF multicast ra ngoài dải này.
 3. Bấm **Bắt đầu quét**, theo dõi tiến độ; có thể bấm **Dừng quét LAN**.
-4. Chọn một hoặc nhiều thiết bị, kiểm tra **Mẫu đường dẫn** rồi bấm **OK**.
+4. Tick các thiết bị cần thêm, kiểm tra **Mẫu đường dẫn** rồi bấm **Thêm camera đã tick**.
 5. URL RTSP được tạo tự động theo mẫu. Mặc định dành cho i-PRO / Panasonic: `/Src/MediaInput/stream_1`; đổi mẫu theo model khác nếu cần.
 6. Nhập tên đăng nhập và mật khẩu.
 7. Bấm **Kết nối và sử dụng**. Nếu cần xem hình, bấm **Xem hình camera**.
 
-WS-Discovery thường chỉ xác định được thiết bị và địa chỉ IP. Đường dẫn stream RTSP phụ thuộc hãng camera nên vẫn cần kiểm tra tài liệu của camera. Ví dụ:
+Quét chỉ xác nhận thiết bị phản hồi giao thức RTSP, kể cả khi yêu cầu đăng nhập. Đường dẫn stream phụ thuộc hãng camera nên vẫn cần kiểm tra tài liệu của camera. Ví dụ:
 
 ```text
 rtsp://192.168.1.100:554/Src/MediaInput/stream_1
@@ -132,10 +136,10 @@ rtsp://192.168.1.100:554/Src/MediaInput/stream_1
 
 Nếu không tìm thấy camera:
 
-- Kiểm tra camera đã bật ONVIF hoặc WS-Discovery.
+- Kiểm tra đã nhập đúng dải IP camera và camera đã bật RTSP cổng 554.
 - Kiểm tra máy và camera có cùng LAN/VLAN hay không.
 - Cho phép ứng dụng qua Windows Firewall trên mạng Private.
-- Thêm camera thủ công nếu thiết bị không hỗ trợ ONVIF discovery.
+- Thêm camera thủ công bằng `IP:cổng` nếu thiết bị dùng cổng RTSP khác 554.
 
 ## Thêm camera RTSP thủ công
 
@@ -161,13 +165,21 @@ Nhập mật khẩu ở dạng nguyên bản. Ví dụ, nếu mật khẩu chứ
 
 - Bấm **+ Thêm camera** hoặc **Quét camera LAN** để tạo tối đa 16 camera.
 - Vào **Tác vụ khác → Kết nối / ngắt tất cả** để nhận đồng thời các nguồn đã lưu.
-- Chọn camera trong danh sách rồi bấm **Kết nối và sử dụng** để chuyển hình đưa vào webcam ảo.
+- **Tick một camera** trong danh sách để kết nối và phát. Tick camera khác sẽ chuyển nguồn; bỏ tick camera đang phát sẽ dừng webcam, các nguồn vẫn có thể tiếp tục kết nối.
+- Chọn dòng chỉ để sửa thông tin; việc này không đổi nguồn đang phát. Sau khi sửa, bấm **Kết nối và sử dụng** để áp dụng (và lưu nếu bật **Lưu cấu hình**).
+- Mỗi dòng hiển thị **Đang phát**, **Đang chuẩn bị phát**, **Đã kết nối · chưa phát** hoặc **Lỗi kết nối · cần kiểm tra**. Chỉ một camera phát tại một thời điểm.
 - Google Meet/Zoom vẫn sử dụng cùng một thiết bị **OBS Virtual Camera** khi chuyển camera.
 - Các thao tác ngắt nguồn, kết nối/ngắt tất cả và xóa camera nằm trong **Tác vụ khác**.
 
 Ứng dụng xuất một camera tại một thời điểm. Các camera còn lại có thể tiếp tục kết nối để chuyển nguồn nhanh, tùy khả năng CPU và mạng của máy.
 
 ## Sử dụng trong Google Meet và Zoom
+
+### Trạng thái và lịch sử sự cố
+
+Phần **Trạng thái sử dụng** hiển thị camera đầu ra, kết nối và tình trạng webcam hiện tại. **Lịch sử sự cố** ghi giờ, camera gặp lỗi, nguyên nhân và việc cần kiểm tra; không đưa mã lỗi kỹ thuật vào biểu mẫu cấu hình. Ví dụ, lỗi đăng nhập sẽ yêu cầu kiểm tra tài khoản/mật khẩu; lỗi đường dẫn sẽ yêu cầu kiểm tra URL RTSP.
+
+Log chẩn đoán có mã lỗi được ghi vào `%ProgramData%\IPCameraBridge\service\service.log` và `%LOCALAPPDATA%\IPCameraBridge\session.log`. Log không ghi mật khẩu hoặc nội dung ngoại lệ decoder nguyên bản. Lịch sử trên giao diện giữ tối đa 120 dòng trong phiên hiện tại.
 
 ### Google Meet
 
@@ -226,7 +238,7 @@ Biểu tượng ở khay hệ thống cho phép mở quản lý, bật/dừng we
 | Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
 |---|---|---|
 | Không có nút **Quét camera LAN** | Đang chạy bản cũ | Gỡ bản cũ nhưng giữ dữ liệu, sau đó cài bản 0.3.2 trở lên. |
-| Quét LAN không thấy camera | ONVIF discovery bị tắt, khác VLAN hoặc firewall chặn multicast | Bật ONVIF/WS-Discovery, kiểm tra mạng Private và thử nhập RTSP thủ công. |
+| Quét LAN không thấy camera | Dải IP sai, khác VLAN, firewall chặn hoặc cổng RTSP khác 554 | Kiểm tra dải IP/cổng, routing và firewall; thêm `IP:cổng` thủ công nếu dùng cổng khác. |
 | Camera từ chối xác thực `401` | Sai tài khoản, mật khẩu hoặc quyền stream | Kiểm tra lại bằng VLC; nhập URL, username và mật khẩu vào ba ô riêng. |
 | Mật khẩu có `@` không kết nối | Mật khẩu đã được mã hóa thủ công | Nhập `@` nguyên bản, không nhập `%40`. |
 | VLC chạy nhưng ứng dụng không chạy | Sai URL/path trong ứng dụng hoặc đang dùng bản/cấu hình cũ | Sao chép đúng URL đã thử trong VLC, lưu lại rồi kết nối lại. |
@@ -288,7 +300,7 @@ File OBS tải về được giữ ngoài Git. Script build kiểm tra SHA-256 v
 - Chỉ xuất một camera tại một thời điểm, không ghép lưới nhiều camera.
 - Không truyền âm thanh từ RTSP hoặc video file.
 - Không điều khiển PTZ, không ghi hình và không có phân tích AI.
-- Quét LAN chỉ phát hiện thiết bị hỗ trợ ONVIF WS-Discovery.
+- Quét LAN chỉ kiểm tra RTSP cổng 554 trong dải IPv4 được nhập; không tự xác định model hay đường dẫn stream, không vượt qua firewall/VLAN.
 - Bộ cài IP Camera Bridge chưa được ký bằng chứng thư phát hành phần mềm.
 
 ## Tài liệu kỹ thuật
